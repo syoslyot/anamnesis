@@ -70,8 +70,11 @@ async function main() {
     printCodexHint(target);
   }
 
+  createCustomizationMarker(target);
+
   console.log('\n✅ Anamnesis installed.');
-  console.log('   Start by running /am hyp to record your first research question.\n');
+  console.log('   Prompts will be customized to your project on the first session.');
+  console.log('   Start by running /am hyp to record your first hypothesis.\n');
 }
 
 // Reads section names from the installed config.yaml (or returns defaults).
@@ -193,6 +196,14 @@ function printClaudeMdHint(target) {
   }
 }
 
+function createCustomizationMarker(target) {
+  const markerPath = path.join(target, '.anamnesis', '.needs-customization');
+  if (!fs.existsSync(markerPath)) {
+    fs.writeFileSync(markerPath, '');
+    console.log('  created  .anamnesis/.needs-customization');
+  }
+}
+
 function printCodexHint(target) {
   const snippetPath = path.join(TEMPLATES, 'codex', 'agents-md-snippet.md');
   if (!fs.existsSync(snippetPath)) return;
@@ -266,7 +277,7 @@ if (require.main === module) {
   module.exports = {
     parseArgs, copyDir, skillsDir, isGitRepo,
     installHook, generateSkill, readInstalledSections,
-    printClaudeMdHint, printCodexHint,
+    printClaudeMdHint, printCodexHint, createCustomizationMarker,
     DEFAULT_SECTIONS,
   };
 }

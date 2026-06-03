@@ -57,7 +57,7 @@ updated: <YYYY-MM-DD>
 
 Ask the user:
 1. A short ID (kebab-case)
-2. Which hypothesis this experiment belongs to (list existing hypotheses if needed)
+2. (Optional) Which hypothesis this experiment belongs to — press enter to skip for a standalone experiment
 3. The specific testable claim
 4. The design (how will this be tested)
 
@@ -66,7 +66,7 @@ Create `.anamnesis/experiments/<id>.md`:
 ```markdown
 ---
 id: <id>
-hypothesis: <hypothesis_id>
+hypothesis: <hypothesis_id>   ← omit this line for standalone experiments
 status: planning
 created: <YYYY-MM-DD>
 updated: <YYYY-MM-DD>
@@ -87,7 +87,7 @@ updated: <YYYY-MM-DD>
 (pending)
 ```
 
-Also add this experiment to the parent hypothesis file under `## {{related}}`.
+If a hypothesis was given, also add this experiment to the parent hypothesis file under `## {{related}}`.
 
 ---
 
@@ -111,7 +111,7 @@ Fill in:
 - Ask: "Any numeric metrics to record? (e.g. `f1: 0.93, loss: 0.016` — press enter to skip)"
   - If provided, add a `metrics:` block to frontmatter with the key-value pairs
 
-Then ask: should this conclusion update the parent hypothesis's `## {{belief}}`? If yes, update it.
+If the experiment has a linked hypothesis, ask: should this conclusion update the parent hypothesis's `## {{belief}}`? If yes, update it.
 
 Finally, read `.anamnesis/config.yaml` and check `reports.auto`:
 - If `true`: automatically run `/am report <id>`
@@ -169,7 +169,7 @@ If no experiments have metrics, show a plain summary (id, updated, conclusion). 
 
 Read:
 - `.anamnesis/experiments/<id>.md`
-- The parent hypothesis at `.anamnesis/hypotheses/<hypothesis-id>.md`
+- The parent hypothesis at `.anamnesis/hypotheses/<hypothesis-id>.md` — skip if no hypothesis is linked
 - The prompt template at `.anamnesis/prompts/report.md`
 
 Write the report following the prompt's structure. Save to `.anamnesis/reports/<id>.md`.
@@ -270,11 +270,12 @@ Hypotheses  open: 2  confirmed: 1  rejected: 0  parked: 1
 Parked
   [old-baseline] parked
 
-Experiments
-  running:  calibration-test
-  blocked:  gpu-sweep (waiting for cluster access)
-  planning: fusion-v2
+Standalone Experiments (no hypothesis)
+  running:  bloom-effect-test
+  concluded: lut-comparison ✅
 ```
+
+Experiments with a `hypothesis:` field appear under their parent hypothesis above. Experiments without one appear under "Standalone Experiments".
 
 Do not modify any files. Do not start any work.
 

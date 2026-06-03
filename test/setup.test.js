@@ -15,6 +15,7 @@ const {
   readInstalledSections,
   printClaudeMdHint,
   printCodexHint,
+  createCustomizationMarker,
   DEFAULT_SECTIONS,
 } = require('../setup');
 
@@ -263,5 +264,32 @@ describe('printCodexHint', () => {
     fs.writeFileSync(path.join(target, 'AGENTS.md'), original);
     printCodexHint(target);
     assert.equal(fs.readFileSync(path.join(target, 'AGENTS.md'), 'utf-8'), original);
+  });
+});
+
+// ─── createCustomizationMarker ───────────────────────────────────────────────
+
+describe('createCustomizationMarker', () => {
+  test('creates .needs-customization inside .anamnesis/', () => {
+    const target = tmpDir();
+    fs.mkdirSync(path.join(target, '.anamnesis'));
+    createCustomizationMarker(target);
+    assert.ok(fs.existsSync(path.join(target, '.anamnesis', '.needs-customization')));
+  });
+
+  test('does not overwrite an existing marker', () => {
+    const target = tmpDir();
+    fs.mkdirSync(path.join(target, '.anamnesis'));
+    const markerPath = path.join(target, '.anamnesis', '.needs-customization');
+    fs.writeFileSync(markerPath, 'already here');
+    createCustomizationMarker(target);
+    assert.equal(fs.readFileSync(markerPath, 'utf-8'), 'already here');
+  });
+
+  test('marker file is empty', () => {
+    const target = tmpDir();
+    fs.mkdirSync(path.join(target, '.anamnesis'));
+    createCustomizationMarker(target);
+    assert.equal(fs.readFileSync(path.join(target, '.anamnesis', '.needs-customization'), 'utf-8'), '');
   });
 });
