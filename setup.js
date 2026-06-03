@@ -156,30 +156,43 @@ function installHook(target) {
 
 function printClaudeMdHint(target) {
   const snippetPath = path.join(TEMPLATES, 'claude', 'claude-md-snippet.md');
-  const snippet = fs.readFileSync(snippetPath, 'utf-8');
+  const snippet = fs.readFileSync(snippetPath, 'utf-8').trimEnd();
   const claudeMd = path.join(target, 'CLAUDE.md');
 
-  if (fs.existsSync(claudeMd) && fs.readFileSync(claudeMd, 'utf-8').includes('anamnesis')) {
-    return;
+  if (fs.existsSync(claudeMd)) {
+    const existing = fs.readFileSync(claudeMd, 'utf-8');
+    if (existing.includes('anamnesis')) {
+      console.log('  skipped  CLAUDE.md (anamnesis already present)');
+      return;
+    }
+    fs.writeFileSync(claudeMd, existing.trimEnd() + '\n\n' + snippet + '\n');
+    console.log('  updated  CLAUDE.md (anamnesis snippet appended)');
+  } else {
+    fs.writeFileSync(claudeMd, snippet + '\n');
+    console.log('  created  CLAUDE.md');
   }
-
-  console.log('\n  ⚠  Add this to your CLAUDE.md:\n');
-  console.log(snippet.split('\n').map(l => '     ' + l).join('\n'));
 }
 
 function printCodexHint(target) {
   const snippetPath = path.join(TEMPLATES, 'codex', 'agents-md-snippet.md');
   if (!fs.existsSync(snippetPath)) return;
 
-  const snippet = fs.readFileSync(snippetPath, 'utf-8');
+  const snippet = fs.readFileSync(snippetPath, 'utf-8').trimEnd();
   const agentsMd = path.join(target, 'AGENTS.md');
 
-  if (fs.existsSync(agentsMd) && fs.readFileSync(agentsMd, 'utf-8').includes('anamnesis')) {
-    return;
+  if (fs.existsSync(agentsMd)) {
+    const existing = fs.readFileSync(agentsMd, 'utf-8');
+    if (existing.includes('anamnesis')) {
+      console.log('  skipped  AGENTS.md (anamnesis already present)');
+      return;
+    }
+    fs.writeFileSync(agentsMd, existing.trimEnd() + '\n\n' + snippet + '\n');
+    console.log('  updated  AGENTS.md (anamnesis snippet appended)');
+  } else {
+    fs.writeFileSync(agentsMd, snippet + '\n');
+    console.log('  created  AGENTS.md');
   }
 
-  console.log('\n  ⚠  Add this to your AGENTS.md:\n');
-  console.log(snippet.split('\n').map(l => '     ' + l).join('\n'));
   console.log('\n  ℹ  Run `node .anamnesis/hooks/sync-context.js` before each Codex session');
   console.log('     to update .anamnesis/context.md with your current research state.\n');
 }

@@ -189,7 +189,7 @@ Options:
 | `--target` | path | cwd | Project directory to install into |
 | `--language` | `zh`, `en` | `zh` | Language for skill templates |
 
-Add the printed `CLAUDE.md` (or `AGENTS.md`) snippet to your project, then start a new session.
+Setup automatically writes the anamnesis snippet into `CLAUDE.md` (or `AGENTS.md`). Start a new session when done.
 
 ---
 
