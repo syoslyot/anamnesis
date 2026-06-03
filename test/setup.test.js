@@ -145,8 +145,8 @@ describe('generateSkill', () => {
     const target = tmpDir();
     generateSkill('claude', target, DEFAULT_SECTIONS);
     const skill = fs.readFileSync(path.join(target, '.claude/skills/am/SKILL.md'), 'utf-8');
-    assert.ok(skill.includes('## 結論'));
-    assert.ok(skill.includes('## 核心問題'));
+    assert.ok(skill.includes('## Conclusion'));
+    assert.ok(skill.includes('## Research Question'));
     assert.ok(!skill.includes('{{conclusion}}'));
   });
 

@@ -38,7 +38,7 @@ function makeExperiment(dir, id, {
   status = 'running',
   conclusion = '',
   updated = '2026-06-01',
-  conclusionKey = '結論',
+  conclusionKey = 'Conclusion',
 } = {}) {
   const conclusionSection = conclusion
     ? `## ${conclusionKey}\n${conclusion}\n`

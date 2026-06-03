@@ -4,11 +4,11 @@ status: open
 created: {{date}}
 updated: {{date}}
 ---
-## 核心問題
+## Research Question
 {{question}}
 
-## 目前認為
+## Current Belief
 {{belief}}
 
-## 相關實驗
-（尚無）
+## Related Experiments
+(none yet)
