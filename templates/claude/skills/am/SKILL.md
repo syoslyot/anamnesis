@@ -1,5 +1,5 @@
 ---
-description: Anamnesis research workflow — manage hypotheses and experiments (/am hyp | exp | run | done | find)
+description: Anamnesis research workflow — manage hypotheses and experiments (/am hyp | exp | run | done | find | status)
 ---
 
 # Anamnesis (`/am`)
@@ -103,6 +103,31 @@ Then ask: should this conclusion update the parent hypothesis's `## 目前認為
 Search across all `.anamnesis/hypotheses/*.md` and `.anamnesis/experiments/*.md` for the keyword.
 
 Show matching files with their status and first meaningful line. If no keyword is given, list all hypotheses and their open/running experiment counts.
+
+---
+
+### `/am status` — 研究總覽
+
+讀取 `.anamnesis/hypotheses/` 和 `.anamnesis/experiments/` 的所有檔案，輸出摘要：
+
+```
+Research Status
+───────────────────────────────
+Hypotheses  open: 2  confirmed: 1  rejected: 0
+
+  [parallel-fusion] open
+    running:  calibration-test
+    planning: fusion-v2
+
+  [fine-tune-vs-l1] confirmed
+    concluded: loss-masking-fix ✅, fusion-alpha-sweep ❌
+
+Experiments
+  running:  calibration-test
+  planning: fusion-v2
+```
+
+不可修改任何檔案，不可開始任何實作工作。
 
 ---
 
