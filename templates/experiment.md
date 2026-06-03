@@ -5,17 +5,17 @@ status: planning
 created: {{date}}
 updated: {{date}}
 ---
-## 假說
+## Testable Claim
 {{claim}}
 
-## 設計
+## Design
 {{design}}
 
-## 結果
-（尚未執行）
+## Results
+(not yet run)
 
-## 執行記錄
-（尚無）
+## Run Log
+(none yet)
 
-## 結論
-（待填）
+## Conclusion
+(pending)

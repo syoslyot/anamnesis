@@ -11,7 +11,7 @@ Records live in `.anamnesis/`:
 **Auto-recording**: During conversation, proactively create and update anamnesis records. When creating a new file, announce it in one line at the end of your response — do not interrupt the flow. When updating existing files, do it silently.
 
 **Session start**: When research context is injected at the start of a session, greet naturally and offer two paths:
-- "可以用 `@.anamnesis/experiments/<id>.md` 讓我直接看原始記錄"
-- "或用 `/am report <id>` 讓我整理成一份完整報告"
+- "Use `@.anamnesis/experiments/<id>.md` to let me read the raw record directly"
+- "Or use `/am report <id>` to generate a structured report"
 
 **Commands**: `/am hyp` · `/am exp` · `/am run` · `/am done` · `/am rerun` · `/am compare` · `/am report` · `/am review` · `/am correct` · `/am park` · `/am unpark` · `/am block` · `/am unblock` · `/am find` · `/am status`

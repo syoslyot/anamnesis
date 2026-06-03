@@ -1,4 +1,4 @@
-version: "0.1"
+version: "0.2"
 
 inject:
   max_concluded: 3       # how many recent concluded experiments to show
@@ -8,11 +8,11 @@ reports:
   auto: false            # true: write report automatically when /am done; false: AI asks once
 
 sections:
-  question:    "核心問題"   # hypothesis: core research question
-  belief:      "目前認為"   # hypothesis: current belief
-  related:     "相關實驗"   # hypothesis: related experiments list
-  hypothesis:  "假說"      # experiment: specific testable claim
-  design:      "設計"      # experiment: how to test
-  results:     "結果"      # experiment: what happened
-  runs:        "執行記錄"  # experiment: individual run log (for /am rerun)
-  conclusion:  "結論"      # experiment: what was learned
+  question:    "Research Question"  # hypothesis: core research question
+  belief:      "Current Belief"     # hypothesis: current belief
+  related:     "Related Experiments" # hypothesis: related experiments list
+  hypothesis:  "Testable Claim"     # experiment: specific testable claim
+  design:      "Design"             # experiment: how to test
+  results:     "Results"            # experiment: what happened
+  runs:        "Run Log"            # experiment: individual run log
+  conclusion:  "Conclusion"         # experiment: what was learned

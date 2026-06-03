@@ -129,13 +129,13 @@ parent: fine-tune-vs-l1  # optional — omit if no parent hypothesis
 created: 2026-06-03
 updated: 2026-06-03
 ---
-## 核心問題
-Parallel Fusion 是否優於 Sequential 架構？
+## Research Question
+Is Parallel Fusion better than Sequential architecture?
 
-## 目前認為
-ft L2 輸出極端值，α 擾動無效，需重設計輸出層
+## Current Belief
+ft L2 outputs extreme values; α perturbation has no effect — output layer needs redesign
 
-## 相關實驗
+## Related Experiments
 - fusion-alpha-sweep (concluded)
 ```
 
@@ -153,24 +153,24 @@ metrics:              # optional — structured key-value results
 created: 2026-05-30
 updated: 2026-05-30
 ---
-## 假說
-只對 assistant token 計算 loss 是否顯著提升 F1？
+## Testable Claim
+Does computing loss only on assistant tokens significantly improve F1?
 
-## 設計
-修改 collate_fn，其他超參數不變，重跑 3 epochs
+## Design
+Modify collate_fn, keep all other hyperparameters fixed, re-run 3 epochs
 
-## 結果
-F1 69% → 93%，Epoch 3 loss 0.0163
+## Results
+F1 69% → 93%, Epoch 3 loss 0.0163
 
-## 執行記錄
+## Run Log
 | Date | Result |
 |------|--------|
 | 2026-05-30 | F1 0.91, loss 0.021 |
 | 2026-05-31 | F1 0.93, loss 0.0163 |
 | 2026-06-01 | F1 0.93, loss 0.0161 |
 
-## 結論
-✅ 成立，loss masking 是最關鍵的訓練 bug
+## Conclusion
+✅ Confirmed — loss masking was the most critical training bug
 ```
 
 ---
@@ -188,14 +188,14 @@ reports:
   auto: false             # true: write report automatically after /am done
 
 sections:
-  question:   "核心問題"  # rename to any language or terminology
-  belief:     "目前認為"
-  related:    "相關實驗"
-  hypothesis: "假說"
-  design:     "設計"
-  results:    "結果"
-  runs:       "執行記錄"
-  conclusion: "結論"
+  question:   "Research Question"  # rename to any language or terminology
+  belief:     "Current Belief"
+  related:    "Related Experiments"
+  hypothesis: "Testable Claim"
+  design:     "Design"
+  results:    "Results"
+  runs:       "Run Log"
+  conclusion: "Conclusion"
 ```
 
 The hook reads `sections.conclusion` at runtime to locate conclusions. All other section names are used by the AI skill when creating files. Change any value and the whole system adapts — no code changes needed.

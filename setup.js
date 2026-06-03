@@ -17,14 +17,14 @@ const SCRIPT_DIR = path.dirname(fs.realpathSync(__filename));
 const TEMPLATES = path.join(SCRIPT_DIR, 'templates');
 
 const DEFAULT_SECTIONS = {
-  question:   '核心問題',
-  belief:     '目前認為',
-  related:    '相關實驗',
-  hypothesis: '假說',
-  design:     '設計',
-  results:    '結果',
-  runs:       '執行記錄',
-  conclusion: '結論',
+  question:   'Research Question',
+  belief:     'Current Belief',
+  related:    'Related Experiments',
+  hypothesis: 'Testable Claim',
+  design:     'Design',
+  results:    'Results',
+  runs:       'Run Log',
+  conclusion: 'Conclusion',
 };
 
 async function main() {
