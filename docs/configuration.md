@@ -16,6 +16,7 @@ sections:
   hypothesis:  "假說"      # experiment: specific testable claim
   design:      "設計"      # experiment: how to test
   results:     "結果"      # experiment: what happened
+  runs:        "執行記錄"  # experiment: individual run log
   conclusion:  "結論"      # experiment: what was learned
 ```
 
@@ -58,6 +59,7 @@ sections:
   hypothesis:  "Testable Claim"
   design:      "Design"
   results:     "Results"
+  runs:        "Run Log"
   conclusion:  "Conclusion"
 ```
 
@@ -69,4 +71,4 @@ node /path/to/anamnesis/setup.js --platform claude --target .
 
 (Setup skips existing files in `.anamnesis/` but always regenerates the skill.)
 
-Any key not specified falls back to the default Chinese value. Only `conclusion` is used by the hook; the rest are used by the AI skill for file creation.
+Any key not specified falls back to the default Chinese value. Only `conclusion` is used by the hook for parsing; the rest are used by the AI skill for file creation.

@@ -23,6 +23,7 @@ const DEFAULT_SECTIONS = {
   hypothesis: '假說',
   design:     '設計',
   results:    '結果',
+  runs:       '執行記錄',
   conclusion: '結論',
 };
 
