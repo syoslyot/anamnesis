@@ -24,7 +24,7 @@ Anamnesis is a research workflow memory layer for AI coding agents. It structure
 
 ## Target Users
 
-Researchers using AI coding agents — ML engineers, data scientists, academics, anyone whose work unit is "hypothesis → experiment → conclusion" rather than "ticket → feature → done".
+Anyone using AI coding agents for iterative experiment work — ML engineers, data scientists, academics, VFX artists, game developers, or anyone whose work unit is "question → experiment → conclusion" rather than "ticket → feature → done". Hypotheses are optional; standalone experiments are fully supported.
 
 ---
 
@@ -41,7 +41,7 @@ hypothesis
 
 experiment
   ├── id
-  ├── hypothesis (parent hypothesis id)
+  ├── hypothesis (parent hypothesis id — optional, omit for standalone experiments)
   ├── status: planning | running | blocked | concluded
   ├── blocked_by (optional — reason or blocking experiment id)
   ├── n (optional — number of runs recorded via /am rerun)
@@ -94,9 +94,13 @@ Runs before every Claude message. Reads `.anamnesis/` and injects a compact cont
 
 This keeps token usage proportional to active work, not total project history.
 
+### First-session customization
+
+After install, `setup.js` creates `.anamnesis/.needs-customization`. On the first session, the AI detects this marker and reads the project context (CLAUDE.md / AGENTS.md, README, `docs/`, `doc/`, `spec/`) to customize `.anamnesis/prompts/` for the project domain — replacing the default academic reviewer persona with something appropriate (e.g. cinematographer, game designer). If no context is found, it asks the user once. Academic defaults apply if still unclear. The marker is deleted after customization.
+
 ### Auto-recording
 
-The installed CLAUDE.md snippet instructs the AI to proactively create and update `.anamnesis/` files during conversation. New files are created silently and announced at the end of the response — no interruption to the research conversation. Slash commands are the escape hatch for explicit control.
+The installed CLAUDE.md snippet instructs the AI to proactively create and update `.anamnesis/` files during conversation. New files are created silently and announced at the end of the response — no interruption to the workflow. Slash commands are the escape hatch for explicit control.
 
 ### Report workflow
 
@@ -180,7 +184,7 @@ ft L2 outputs extreme values; α perturbation has no effect — output layer nee
 ```markdown
 ---
 id: loss-masking-fix
-hypothesis: fine-tune-vs-l1
+hypothesis: fine-tune-vs-l1   # optional — omit for standalone experiments
 status: concluded              # planning | running | blocked | concluded
 blocked_by:                    # optional — set when status is blocked
 n: 3                           # optional — number of runs (managed by /am rerun)

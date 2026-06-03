@@ -1,6 +1,6 @@
 ---
 id: {{id}}
-hypothesis: {{hypothesis_id}}
+hypothesis: {{hypothesis_id}}   ← omit this line for standalone experiments
 status: planning
 created: {{date}}
 updated: {{date}}

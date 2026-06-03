@@ -8,17 +8,19 @@ Research workflow memory for AI coding agents. Structures work around **hypothes
 
 ## Why
 
-AI coding agents forget everything between sessions. Tools like `claude-mem` solve this for feature development, but researchers have a different problem: they need to remember *what was concluded*, not just *what was done*.
+AI coding agents forget everything between sessions. Tools like `claude-mem` solve this for feature development, but iterative experiment work has a different problem: you need to remember *what was concluded*, not just *what was done*.
 
-Anamnesis structures research work as:
+Anamnesis structures this as:
 
 ```
-hypothesis (open research question)
-  └── experiment (specific testable claim + design + result + conclusion)
+hypothesis (open question)                 ← optional
+  └── experiment (claim + design + result + conclusion)
         └── report → review → correct
 ```
 
-At every session start, the AI reads the current state of your research and picks up where you left off.
+Works for any iterative experiment workflow — ML research, visual effects testing, game mechanic iteration, A/B studies, or anything else where you run something, observe what happens, and decide what to try next.
+
+At every session start, the AI reads the current state and picks up where you left off.
 
 ---
 
@@ -97,21 +99,42 @@ A Node.js hook runs before every Claude message and injects active research stat
 <anamnesis>
 
 Open Hypotheses:
-  • [parallel-fusion] Parallel Fusion 是否優於 Sequential 架構？
+  • [parallel-fusion] Is Parallel Fusion better than Sequential architecture?
 
 Running Experiments:
-  • [calibration-test] 測試 L2 logit 是否能作為連續分數 (n=2)
+  • [calibration-test] Does L2 logit work as a continuous score? (n=2)
 
 Blocked Experiments:
-  ⏸ [gpu-sweep] GPU 並行是否加速訓練 — waiting for cluster access
+  ⏸ [gpu-sweep] Does parallel GPU training reduce wall time? — waiting for cluster access
 
 Recent Conclusions:
-  [loss-masking-fix] ✅ 成立，loss masking 是最關鍵的訓練 bug (n=3)
+  [loss-masking-fix] ✅ Confirmed — loss masking was the most critical training bug (n=3)
 
 </anamnesis>
 ```
 
 Token-efficient: only injects active work. Parked hypotheses, planning experiments, and full history are excluded.
+
+### Standalone Experiments
+
+Hypotheses are optional. Experiments can exist on their own — no parent question required:
+
+```markdown
+---
+id: bloom-effect-test
+status: running
+created: 2026-06-04
+updated: 2026-06-04
+---
+## Testable Claim
+Does adding a bloom pass make the night scene feel warmer without blowing highlights?
+```
+
+Standalone experiments appear in context injection and `/am status` just like hypothesis-linked ones.
+
+### Prompt Customization
+
+On the first session after install, the AI reads your project context (README, CLAUDE.md, `docs/`) and rewrites `.anamnesis/prompts/` to match your domain — a video production project gets a cinematographer as reviewer instead of a professor. If no context is found, it asks you once. Academic defaults apply if still unclear.
 
 ---
 
@@ -144,7 +167,7 @@ ft L2 outputs extreme values; α perturbation has no effect — output layer nee
 ```markdown
 ---
 id: loss-masking-fix
-hypothesis: fine-tune-vs-l1
+hypothesis: fine-tune-vs-l1   # optional — omit for standalone experiments
 status: concluded     # planning | running | blocked | concluded
 n: 3                  # optional — run count, managed by /am rerun
 metrics:              # optional — structured key-value results

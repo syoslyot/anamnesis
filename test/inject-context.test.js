@@ -48,6 +48,24 @@ function makeExperiment(dir, id, {
   );
 }
 
+function makeStandaloneExperiment(dir, id, {
+  status = 'running',
+  conclusion = '',
+  updated = '2026-06-01',
+  conclusionKey = 'Conclusion',
+  blockedBy = '',
+  n = null,
+} = {}) {
+  const conclusionSection = conclusion
+    ? `## ${conclusionKey}\n${conclusion}\n`
+    : `## ${conclusionKey}\n(pending)\n`;
+  const blockedLine = blockedBy ? `blocked_by: ${blockedBy}\n` : '';
+  const nLine = n != null ? `n: ${n}\n` : '';
+  write(dir, `experiments/${id}.md`,
+    `---\nid: ${id}\nstatus: ${status}\n${blockedLine}${nLine}updated: ${updated}\n---\n## Claim\nStandalone claim\n\n## Design\nRun it\n\n## Results\n-\n\n${conclusionSection}`
+  );
+}
+
 // ─── escapeRegex ─────────────────────────────────────────────────────────────
 
 describe('escapeRegex', () => {
@@ -334,5 +352,65 @@ describe('buildContext', () => {
     makeExperiment(dir, 'exp-de', { status: 'concluded', conclusion: '✅ gut', conclusionKey: 'Fazit' });
     const ctx = buildContext(dir);
     assert.ok(ctx.includes('✅ gut'));
+  });
+});
+
+// ─── standalone experiments (no hypothesis field) ────────────────────────────
+
+describe('buildContext — standalone experiments', () => {
+  test('standalone running experiment appears in context', () => {
+    const dir = tmpDir();
+    makeStandaloneExperiment(dir, 'bloom-test', { status: 'running' });
+    const ctx = buildContext(dir);
+    assert.ok(ctx.includes('Running Experiments'));
+    assert.ok(ctx.includes('[bloom-test]'));
+  });
+
+  test('standalone blocked experiment appears in context', () => {
+    const dir = tmpDir();
+    makeStandaloneExperiment(dir, 'lut-test', { status: 'blocked', blockedBy: 'waiting for footage' });
+    const ctx = buildContext(dir);
+    assert.ok(ctx.includes('Blocked Experiments'));
+    assert.ok(ctx.includes('[lut-test]'));
+    assert.ok(ctx.includes('waiting for footage'));
+  });
+
+  test('standalone concluded experiment appears in context', () => {
+    const dir = tmpDir();
+    makeStandaloneExperiment(dir, 'grade-test', { status: 'concluded', conclusion: '✅ looks great' });
+    const ctx = buildContext(dir);
+    assert.ok(ctx.includes('Recent Conclusions'));
+    assert.ok(ctx.includes('✅ looks great'));
+  });
+
+  test('standalone planning experiment excluded by default', () => {
+    const dir = tmpDir();
+    makeStandaloneExperiment(dir, 'draft-test', { status: 'planning' });
+    assert.equal(buildContext(dir), null);
+  });
+
+  test('standalone planning experiment included when include_planning is true', () => {
+    const dir = tmpDir();
+    write(dir, 'config.yaml', 'inject:\n  include_planning: true\n');
+    makeStandaloneExperiment(dir, 'draft-test', { status: 'planning' });
+    const ctx = buildContext(dir);
+    assert.ok(ctx.includes('Planned Experiments'));
+    assert.ok(ctx.includes('[draft-test]'));
+  });
+
+  test('standalone experiment shows n= tag when n is set', () => {
+    const dir = tmpDir();
+    makeStandaloneExperiment(dir, 'bloom-test', { status: 'running', n: 4 });
+    const ctx = buildContext(dir);
+    assert.ok(ctx.includes('(n=4)'));
+  });
+
+  test('standalone and hypothesis-linked experiments coexist in context', () => {
+    const dir = tmpDir();
+    makeExperiment(dir, 'ml-exp', { status: 'running' });
+    makeStandaloneExperiment(dir, 'vfx-exp', { status: 'running' });
+    const ctx = buildContext(dir);
+    assert.ok(ctx.includes('[ml-exp]'));
+    assert.ok(ctx.includes('[vfx-exp]'));
   });
 });
