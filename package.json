@@ -1,0 +1,29 @@
+{
+  "name": "anamnesis",
+  "version": "0.1.0",
+  "description": "Research workflow memory for AI coding agents",
+  "keywords": [
+    "claude-code",
+    "ai-agent",
+    "research",
+    "experiment",
+    "workflow",
+    "memory"
+  ],
+  "homepage": "https://github.com/syoslyot/anamnesis",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/syoslyot/anamnesis.git"
+  },
+  "license": "MIT",
+  "author": "syoslyot",
+  "bin": {
+    "anamnesis": "./setup.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "setup": "node setup.js"
+  }
+}

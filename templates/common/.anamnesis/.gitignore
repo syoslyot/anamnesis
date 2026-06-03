@@ -1,0 +1,2 @@
+# Keep directory structure, ignore nothing by default.
+# Add patterns here if you want to exclude certain experiments from version control.

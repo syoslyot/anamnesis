@@ -1,0 +1,7 @@
+version: "0.1"
+
+inject:
+  max_concluded: 3       # how many recent concluded experiments to show
+  include_planning: false # show planning experiments in context
+
+language: auto           # auto | en | zh
