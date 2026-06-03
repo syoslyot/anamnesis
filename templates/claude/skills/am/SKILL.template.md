@@ -1,25 +1,25 @@
 ---
-description: Anamnesis research workflow — manage hypotheses and experiments (am hyp | exp | run | done | find | status)
+description: Anamnesis research workflow — manage hypotheses and experiments (/am hyp | exp | run | done | find | status)
 ---
 
-# Anamnesis (`am`)
+# Anamnesis (`/am`)
 
 Research workflow memory for AI agents. Manages hypotheses and experiments stored in `.anamnesis/`.
 
 ## Subcommands
 
-Arguments are passed after `am`. Examples: `am hyp`, `am done`, `am find calibration`.
+Arguments are passed after `/am`. Examples: `/am hyp`, `/am done`, `/am find calibration`.
 
 ---
 
-### `am hyp` — New hypothesis
+### `/am hyp` — New hypothesis
 
 Ask the user:
 1. A short ID (kebab-case, e.g. `parallel-fusion`)
 2. The core research question
 3. What they currently believe (their working hypothesis)
 
-Then create `.anamnesis/hypotheses/<id>.md`:
+Then create `.anamnesis/hypotheses/<id>.md` using this format:
 
 ```markdown
 ---
@@ -28,13 +28,13 @@ status: open
 created: <YYYY-MM-DD>
 updated: <YYYY-MM-DD>
 ---
-## Core Question
+## {{question}}
 <question>
 
-## Current Belief
+## {{belief}}
 <belief>
 
-## Related Experiments
+## {{related}}
 (none yet)
 ```
 
@@ -42,7 +42,7 @@ Confirm the file was created. Do NOT start any implementation work.
 
 ---
 
-### `am exp` — New experiment
+### `/am exp` — New experiment
 
 Ask the user:
 1. A short ID (kebab-case)
@@ -60,24 +60,24 @@ status: planning
 created: <YYYY-MM-DD>
 updated: <YYYY-MM-DD>
 ---
-## Hypothesis
+## {{hypothesis}}
 <testable claim>
 
-## Design
+## {{design}}
 <how to test>
 
-## Results
+## {{results}}
 (not yet run)
 
-## Conclusion
+## {{conclusion}}
 (pending)
 ```
 
-Also add this experiment to the parent hypothesis file under `## Related Experiments`.
+Also add this experiment to the parent hypothesis file under `## {{related}}`.
 
 ---
 
-### `am run` — Start experiment
+### `/am run` — Start experiment
 
 Ask which experiment to start (list `planning` experiments).
 
@@ -85,20 +85,20 @@ Update its `status` from `planning` → `running` and `updated` date.
 
 ---
 
-### `am done` — Conclude experiment
+### `/am done` — Conclude experiment
 
 Ask which experiment to conclude (list `running` experiments).
 
 Fill in:
-- `## Results`: what actually happened
-- `## Conclusion`: what was learned (start with ✅ confirmed / ❌ rejected / 🔄 partial)
+- `## {{results}}`: what actually happened
+- `## {{conclusion}}`: what was learned (start with ✅ confirmed / ❌ rejected / 🔄 partial)
 - Update `status` → `concluded` and `updated` date
 
-Then ask: should this conclusion update the parent hypothesis's `## Current Belief`? If yes, update it.
+Then ask: should this conclusion update the parent hypothesis's `## {{belief}}`? If yes, update it.
 
 ---
 
-### `am find <keyword>` — Search
+### `/am find <keyword>` — Search
 
 Search across all `.anamnesis/hypotheses/*.md` and `.anamnesis/experiments/*.md` for the keyword.
 
@@ -106,7 +106,7 @@ Show matching files with their status and first meaningful line. If no keyword i
 
 ---
 
-### `am status` — Research overview
+### `/am status` — Research overview
 
 Read all files in `.anamnesis/hypotheses/` and `.anamnesis/experiments/` and print a summary:
 
