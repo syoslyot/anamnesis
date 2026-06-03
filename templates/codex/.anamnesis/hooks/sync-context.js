@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
- * Anamnesis — UserPromptSubmit hook
- * Injects active hypotheses and experiments into Claude's context.
+ * Anamnesis — Codex context sync
  *
- * Claude Code hook format:
- *   stdin:  JSON with session info (cwd, prompt, etc.)
- *   stdout: JSON with { additionalContext: string }
+ * Writes current research state to .anamnesis/context.md so it can be
+ * referenced from AGENTS.md before each Codex session.
+ *
+ * Usage: node .anamnesis/hooks/sync-context.js
  */
 
 'use strict';
@@ -13,26 +13,25 @@
 const fs = require('fs');
 const path = require('path');
 
-async function main() {
-  const raw = await readStdin();
-  if (!raw.trim()) process.exit(0);
+function main() {
+  const anamnesisDir = path.join(process.cwd(), '.anamnesis');
+  const outputPath = path.join(anamnesisDir, 'context.md');
 
-  let data = {};
-  try { data = JSON.parse(raw); } catch { process.exit(0); }
+  if (!fs.existsSync(anamnesisDir)) {
+    console.error('No .anamnesis directory found. Run setup first.');
+    process.exit(1);
+  }
 
-  const cwd = data.cwd || process.cwd();
-  const anamnesisDir = path.join(cwd, '.anamnesis');
+  const config = loadConfig(anamnesisDir);
+  const context = buildContext(anamnesisDir, config);
 
-  if (!fs.existsSync(anamnesisDir)) process.exit(0);
-
-  const context = buildContext(anamnesisDir);
-  if (!context) process.exit(0);
-
-  process.stdout.write(JSON.stringify({ additionalContext: context }));
+  fs.writeFileSync(outputPath, context);
+  console.log(`✅ Updated .anamnesis/context.md`);
 }
 
-function buildContext(anamnesisDir) {
-  const config = loadConfig(anamnesisDir);
+// ─── helpers ────────────────────────────────────────────────────────────────
+
+function buildContext(anamnesisDir, config) {
   const sections = [];
 
   const hypotheses = loadFiles(path.join(anamnesisDir, 'hypotheses'), config);
@@ -80,9 +79,18 @@ function buildContext(anamnesisDir) {
     }).join('\n'));
   }
 
-  if (!sections.length) return null;
+  if (!sections.length) {
+    return `<!-- anamnesis: no active research -->\n`;
+  }
 
-  return ['<anamnesis>', ...sections, '</anamnesis>'].join('\n\n');
+  const updated = new Date().toISOString().slice(0, 10);
+  return [
+    `<!-- anamnesis context — updated ${updated} -->`,
+    '<anamnesis>',
+    ...sections,
+    '</anamnesis>',
+    ''
+  ].join('\n\n');
 }
 
 const DEFAULT_SECTIONS = {
@@ -139,16 +147,13 @@ function parseFile(filePath, conclusionHeader) {
   try {
     const content = fs.readFileSync(filePath, 'utf-8');
     const { meta, body } = parseFrontmatter(content);
-
     const bodyLines = body.split('\n').filter(l => l.trim());
     const firstLine = bodyLines.find(l => !l.startsWith('#'))?.trim() || '';
-
     const re = new RegExp(`^## ${escapeRegex(conclusionHeader)}\\s*\\n([\\s\\S]*?)(?=\\n##|$)`, 'm');
     const conclusionMatch = body.match(re);
     const conclusion = conclusionMatch
       ? conclusionMatch[1].split('\n').find(l => l.trim())?.trim() || ''
       : '';
-
     return { meta, firstLine, conclusion };
   } catch {
     return null;
@@ -189,19 +194,8 @@ function parseFrontmatter(content) {
   return { meta, body: content.slice(end + 5) };
 }
 
-function readStdin() {
-  return new Promise(resolve => {
-    let buf = '';
-    process.stdin.setEncoding('utf-8');
-    process.stdin.on('data', c => buf += c);
-    process.stdin.on('end', () => resolve(buf));
-    process.stdin.on('error', () => resolve(''));
-    setTimeout(() => resolve(buf), 1000);
-  });
-}
-
 if (require.main === module) {
-  main().catch(() => process.exit(0));
+  main();
 } else {
   module.exports = { parseFrontmatter, parseFile, loadFiles, loadConfig, buildContext, DEFAULT_SECTIONS, escapeRegex };
 }

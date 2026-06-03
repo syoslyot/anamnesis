@@ -2,6 +2,17 @@ version: "0.1"
 
 inject:
   max_concluded: 3       # how many recent concluded experiments to show
-  include_planning: false # show planning experiments in context
+  include_planning: false # show planning (not-yet-started) experiments in context
 
-language: auto           # auto | en | zh
+reports:
+  auto: false            # true: write report automatically when /am done; false: AI asks once
+
+sections:
+  question:    "核心問題"   # hypothesis: core research question
+  belief:      "目前認為"   # hypothesis: current belief
+  related:     "相關實驗"   # hypothesis: related experiments list
+  hypothesis:  "假說"      # experiment: specific testable claim
+  design:      "設計"      # experiment: how to test
+  results:     "結果"      # experiment: what happened
+  runs:        "執行記錄"  # experiment: individual run log (for /am rerun)
+  conclusion:  "結論"      # experiment: what was learned

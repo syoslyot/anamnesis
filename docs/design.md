@@ -33,7 +33,8 @@ Researchers using AI coding agents — ML engineers, data scientists, academics,
 ```
 hypothesis
   ├── id
-  ├── status: open | confirmed | rejected
+  ├── status: open | parked | confirmed | rejected
+  ├── parent (optional — id of the hypothesis this one stems from)
   ├── core question
   ├── current belief
   └── linked experiments
@@ -41,10 +42,14 @@ hypothesis
 experiment
   ├── id
   ├── hypothesis (parent)
-  ├── status: planning | running | concluded
+  ├── status: planning | running | blocked | concluded
+  ├── blocked_by (optional — reason or blocking experiment id)
+  ├── n (optional — number of runs recorded via /am rerun)
+  ├── metrics (optional — structured key-value pairs recorded via /am done)
   ├── hypothesis (specific testable claim)
   ├── design (how to test)
   ├── results
+  ├── runs (individual run log, one row per /am rerun call)
   └── conclusion
 ```
 
@@ -76,9 +81,11 @@ user-project/
 Runs before every Claude message. Reads `.anamnesis/` and injects a compact context block:
 
 - All `open` hypotheses (full first line)
+- `parked` hypotheses: not injected (deprioritized, visible only in `/am status`)
 - All `running` experiments (full first line)
+- All `blocked` experiments (first line + blocked_by reason if set)
 - Last 3 `concluded` experiments (one-line summary + icon)
-- `planning` experiments: not injected (not started yet)
+- `planning` experiments: not injected by default (configurable)
 
 This keeps token usage proportional to active work, not total project history.
 
@@ -90,11 +97,17 @@ The installed CLAUDE.md snippet instructs the AI to proactively create and updat
 
 | Command | Action |
 |---------|--------|
-| `/am hyp` | Create new hypothesis file |
+| `/am hyp` | Create new hypothesis file (optional parent link) |
 | `/am exp` | Create new experiment file (status: planning) |
 | `/am run` | Set experiment status → running |
 | `/am done` | Fill conclusion, set status → concluded |
 | `/am find` | Search across hypotheses and experiments |
+| `/am rerun` | Append a run to an experiment's run log; update `n:` counter |
+| `/am compare` | Print metrics comparison table for all concluded experiments under a hypothesis |
+| `/am park` | Set hypothesis status → parked (deprioritize without rejecting) |
+| `/am unpark` | Set hypothesis status → open |
+| `/am block` | Set experiment status → blocked (with optional reason) |
+| `/am unblock` | Set experiment status → running |
 
 ---
 
@@ -130,6 +143,7 @@ Future: `npx anamnesis init --platform claude`
 ---
 id: parallel-fusion
 status: open
+parent: fine-tune-vs-l1        # optional — omit if no parent
 created: 2026-06-03
 updated: 2026-06-03
 ---
@@ -150,7 +164,12 @@ ft L2 輸出極端值導致 α 擾動無效，需重設計輸出層
 ---
 id: loss-masking-fix
 hypothesis: fine-tune-vs-l1
-status: concluded
+status: concluded              # planning | running | blocked | concluded
+blocked_by:                    # optional — set when status is blocked
+n: 3                           # optional — number of runs (managed by /am rerun)
+metrics:                       # optional — structured results (set by /am done)
+  f1: 0.93
+  loss: 0.0163
 created: 2026-05-30
 updated: 2026-05-30
 ---
