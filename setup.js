@@ -242,4 +242,12 @@ async function askPlatform() {
   });
 }
 
-main().catch(err => { console.error(err.message); process.exit(1); });
+if (require.main === module) {
+  main().catch(err => { console.error(err.message); process.exit(1); });
+} else {
+  module.exports = {
+    parseArgs, copyDir, skillsDir, isGitRepo,
+    installHook, installClaudeSkillLanguage,
+    printClaudeMdHint, printCodexHint,
+  };
+}
