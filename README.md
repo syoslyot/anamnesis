@@ -45,6 +45,7 @@ node setup.js --platform claude
 | `/am run` | Mark an experiment as started |
 | `/am done` | Record results and conclusion |
 | `/am find <keyword>` | Search past hypotheses and experiments |
+| `/am status` | Overview of all hypotheses and experiments |
 
 No commands required for routine use — the AI proactively creates and updates records during normal conversation.
 
@@ -135,13 +136,31 @@ F1 69% → 93%，Epoch 3 loss 0.0163
 
 ---
 
+## Configuration
+
+Settings live in `.anamnesis/config.yaml` inside your project:
+
+```yaml
+inject:
+  max_concluded: 3        # recent concluded experiments to show in context
+  include_planning: false # show not-yet-started experiments in context
+```
+
+See [docs/configuration.md](docs/configuration.md) for the full reference.
+
+---
+
 ## Platform Support
 
 | Platform | Hook | Skill |
 |----------|------|-------|
 | Claude Code | ✅ | ✅ |
-| Codex | 🔜 v0.2 | ✅ |
+| Codex | ✅ (pre-session sync) | ✅ |
 | OpenCode | 🔜 | 🔜 |
+
+Codex doesn't support real-time hooks. Instead, run `node .anamnesis/hooks/sync-context.js` before each session to update `.anamnesis/context.md`.
+
+To add support for a new platform, see [docs/platforms.md](docs/platforms.md).
 
 ---
 
@@ -153,12 +172,24 @@ F1 69% → 93%，Epoch 3 loss 0.0163
 ### Steps
 
 ```bash
+# Recommended: via npx (no clone needed)
+npx anamnesis@github:syoslyot/anamnesis init --platform claude
+
+# Or clone and run directly
 git clone https://github.com/syoslyot/anamnesis
 cd anamnesis
 node setup.js --platform claude --target /path/to/your/project
 ```
 
-Add the printed CLAUDE.md snippet to your project's `CLAUDE.md`, then start a new Claude Code session.
+Options:
+
+| Flag | Values | Default | Description |
+|------|--------|---------|-------------|
+| `--platform` | `claude`, `codex` | prompted | Target AI agent platform |
+| `--target` | path | cwd | Project directory to install into |
+| `--language` | `zh`, `en` | `zh` | Language for skill templates |
+
+Setup automatically writes the anamnesis snippet into `CLAUDE.md` (or `AGENTS.md`). Start a new session when done.
 
 ---
 
