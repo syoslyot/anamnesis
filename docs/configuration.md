@@ -3,21 +3,24 @@
 Anamnesis reads `.anamnesis/config.yaml` in the user's project directory. All fields are optional; defaults are shown below.
 
 ```yaml
-version: "0.1"
+version: "0.2"
 
 inject:
   max_concluded: 3        # how many recent concluded experiments to show
-  include_planning: false  # whether to show planning (not-yet-started) experiments
+  include_planning: false # whether to show planning (not-yet-started) experiments
+
+reports:
+  auto: false             # true: generate report automatically after /am done
 
 sections:
-  question:    "核心問題"   # hypothesis: core research question
-  belief:      "目前認為"   # hypothesis: current belief
-  related:     "相關實驗"   # hypothesis: related experiments list
-  hypothesis:  "假說"      # experiment: specific testable claim
-  design:      "設計"      # experiment: how to test
-  results:     "結果"      # experiment: what happened
-  runs:        "執行記錄"  # experiment: individual run log
-  conclusion:  "結論"      # experiment: what was learned
+  question:    "Research Question"    # hypothesis: core research question
+  belief:      "Current Belief"       # hypothesis: current belief
+  related:     "Related Experiments"  # hypothesis: related experiments list
+  hypothesis:  "Testable Claim"       # experiment: specific testable claim
+  design:      "Design"               # experiment: how to test
+  results:     "Results"              # experiment: what happened
+  runs:        "Run Log"              # experiment: individual run log
+  conclusion:  "Conclusion"           # experiment: what was learned
 ```
 
 ---
@@ -42,25 +45,34 @@ When `true`, experiments with `status: planning` are included in the injected co
 
 ---
 
+## `reports.auto`
+
+**Type**: boolean  
+**Default**: `false`
+
+When `false` (default), the AI asks once after `/am done` whether to write a report. When `true`, `/am report` runs automatically as part of the conclusion flow.
+
+---
+
 ## `sections`
 
 **Type**: map of string → string  
-**Default**: Chinese headers (see above)
+**Default**: English headers (see above)
 
-Controls the markdown section header names used in all `.anamnesis/` files. The hook reads this at runtime to locate the conclusion section; the `/am` skill uses these names when creating new files.
+Controls the markdown section header names used in all `.anamnesis/` files. The hook reads `sections.conclusion` at runtime to locate conclusions; the `/am` skill uses all names when creating new files.
 
-To use a different language or terminology, edit the values in `config.yaml` after install:
+To use a different language or terminology, edit the values in `config.yaml` after install. For example, to use Chinese headers:
 
 ```yaml
 sections:
-  question:    "Research Question"
-  belief:      "Current Belief"
-  related:     "Related Experiments"
-  hypothesis:  "Testable Claim"
-  design:      "Design"
-  results:     "Results"
-  runs:        "Run Log"
-  conclusion:  "Conclusion"
+  question:    "核心問題"
+  belief:      "目前認為"
+  related:     "相關實驗"
+  hypothesis:  "假說"
+  design:      "設計"
+  results:     "結果"
+  runs:        "執行記錄"
+  conclusion:  "結論"
 ```
 
 Then regenerate the skill to match:
@@ -69,6 +81,6 @@ Then regenerate the skill to match:
 node /path/to/anamnesis/setup.js --platform claude --target .
 ```
 
-(Setup skips existing files in `.anamnesis/` but always regenerates the skill.)
+Setup skips existing files in `.anamnesis/` but always regenerates the skill, so section names in the generated `SKILL.md` stay in sync with your config.
 
-Any key not specified falls back to the default Chinese value. Only `conclusion` is used by the hook for parsing; the rest are used by the AI skill for file creation.
+Any key not specified falls back to the default English value.

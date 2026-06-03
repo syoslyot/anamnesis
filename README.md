@@ -15,6 +15,7 @@ Anamnesis structures research work as:
 ```
 hypothesis (open research question)
   └── experiment (specific testable claim + design + result + conclusion)
+        └── report → review → correct
 ```
 
 At every session start, the AI reads the current state of your research and picks up where you left off.
@@ -27,7 +28,8 @@ At every session start, the AI reads the current state of your research and pick
 # Install into your project (writes CLAUDE.md automatically)
 npx anamnesis@github:syoslyot/anamnesis init --platform claude
 
-# Start a new Claude Code session — the AI will suggest creating a hypothesis
+# Start a new Claude Code session and say what you're researching.
+# The AI will note it as a hypothesis automatically.
 # Or explicitly:
 /am hyp
 ```
@@ -36,22 +38,37 @@ npx anamnesis@github:syoslyot/anamnesis init --platform claude
 
 ## Commands
 
+No commands required for routine use — the AI proactively creates and updates records during normal conversation.
+
+### Research lifecycle
+
 | Command | What it does |
 |---------|-------------|
 | `/am hyp` | Record a new research question (hypothesis) |
 | `/am exp` | Design a new experiment |
 | `/am run` | Mark an experiment as started |
 | `/am done` | Record results and conclusion |
-| `/am find <keyword>` | Search past hypotheses and experiments |
-| `/am status` | Overview of all hypotheses and experiments |
 | `/am rerun` | Append a run to an experiment's run log |
 | `/am compare` | Compare metrics across concluded experiments under a hypothesis |
+
+### Reports
+
+| Command | What it does |
+|---------|-------------|
+| `/am report <id>` | Write a structured experiment report |
+| `/am review <id>` | Generate a professor-style critique of the report |
+| `/am correct <id>` | Revise the report based on the review |
+
+### Workflow management
+
+| Command | What it does |
+|---------|-------------|
 | `/am park` | Deprioritize a hypothesis without rejecting it |
 | `/am unpark` | Bring a parked hypothesis back to active |
 | `/am block` | Mark an experiment as blocked (with optional reason) |
 | `/am unblock` | Resume a blocked experiment |
-
-No commands required for routine use — the AI proactively creates and updates records during normal conversation.
+| `/am find <keyword>` | Search past hypotheses and experiments |
+| `/am status` | Overview of all hypotheses and experiments |
 
 ---
 
@@ -63,8 +80,10 @@ Everything is stored as plain markdown in your project repo:
 
 ```
 .anamnesis/
-  hypotheses/parallel-fusion.md
-  experiments/loss-masking-fix.md
+  hypotheses/        one .md file per hypothesis
+  experiments/       one .md file per experiment
+  reports/           AI-written reports, reviews, and corrections
+  prompts/           customizable prompt templates (report, review, correct)
   config.yaml
 ```
 
@@ -81,16 +100,18 @@ Open Hypotheses:
   • [parallel-fusion] Parallel Fusion 是否優於 Sequential 架構？
 
 Running Experiments:
-  • [calibration-test] 測試 L2 logit 是否能作為連續分數
+  • [calibration-test] 測試 L2 logit 是否能作為連續分數 (n=2)
+
+Blocked Experiments:
+  ⏸ [gpu-sweep] GPU 並行是否加速訓練 — waiting for cluster access
 
 Recent Conclusions:
-  [loss-masking-fix] ✅ 成立，loss masking 是最關鍵的訓練 bug
-  [fusion-alpha-sweep] ❌ α 無法改變 Fusion 結果
+  [loss-masking-fix] ✅ 成立，loss masking 是最關鍵的訓練 bug (n=3)
 
 </anamnesis>
 ```
 
-Token-efficient: only injects active work, not the full history.
+Token-efficient: only injects active work. Parked hypotheses, planning experiments, and full history are excluded.
 
 ---
 
@@ -108,13 +129,13 @@ parent: fine-tune-vs-l1  # optional — omit if no parent hypothesis
 created: 2026-06-03
 updated: 2026-06-03
 ---
-## 核心問題
-Parallel Fusion 是否優於 Sequential 架構？
+## Research Question
+Is Parallel Fusion better than Sequential architecture?
 
-## 目前認為
-ft L2 輸出極端值，α 擾動無效，需重設計輸出層
+## Current Belief
+ft L2 outputs extreme values; α perturbation has no effect — output layer needs redesign
 
-## 相關實驗
+## Related Experiments
 - fusion-alpha-sweep (concluded)
 ```
 
@@ -132,24 +153,24 @@ metrics:              # optional — structured key-value results
 created: 2026-05-30
 updated: 2026-05-30
 ---
-## 假說
-只對 assistant token 計算 loss 是否顯著提升 F1？
+## Testable Claim
+Does computing loss only on assistant tokens significantly improve F1?
 
-## 設計
-修改 collate_fn，其他超參數不變，重跑 3 epochs
+## Design
+Modify collate_fn, keep all other hyperparameters fixed, re-run 3 epochs
 
-## 結果
-F1 69% → 93%，Epoch 3 loss 0.0163
+## Results
+F1 69% → 93%, Epoch 3 loss 0.0163
 
-## 執行記錄
+## Run Log
 | Date | Result |
 |------|--------|
 | 2026-05-30 | F1 0.91, loss 0.021 |
 | 2026-05-31 | F1 0.93, loss 0.0163 |
 | 2026-06-01 | F1 0.93, loss 0.0161 |
 
-## 結論
-✅ 成立，loss masking 是最關鍵的訓練 bug
+## Conclusion
+✅ Confirmed — loss masking was the most critical training bug
 ```
 
 ---
@@ -163,17 +184,21 @@ inject:
   max_concluded: 3        # recent concluded experiments to show in context
   include_planning: false # show not-yet-started experiments in context
 
+reports:
+  auto: false             # true: write report automatically after /am done
+
 sections:
-  question:   "核心問題"  # rename to any language or terminology
-  belief:     "目前認為"
-  related:    "相關實驗"
-  hypothesis: "假說"
-  design:     "設計"
-  results:    "結果"
-  conclusion: "結論"
+  question:   "Research Question"  # rename to any language or terminology
+  belief:     "Current Belief"
+  related:    "Related Experiments"
+  hypothesis: "Testable Claim"
+  design:     "Design"
+  results:    "Results"
+  runs:       "Run Log"
+  conclusion: "Conclusion"
 ```
 
-The hook reads `sections.conclusion` at runtime to locate the conclusion in each experiment file. All other section names are used by the AI skill when creating new files. Change any value and the whole system adapts — no code changes needed.
+The hook reads `sections.conclusion` at runtime to locate conclusions. All other section names are used by the AI skill when creating files. Change any value and the whole system adapts — no code changes needed.
 
 See [docs/configuration.md](docs/configuration.md) for the full reference.
 
@@ -181,13 +206,13 @@ See [docs/configuration.md](docs/configuration.md) for the full reference.
 
 ## Platform Support
 
-| Platform | Hook | Skill |
-|----------|------|-------|
-| Claude Code | ✅ | ✅ |
-| Codex | ✅ (pre-session sync) | ✅ |
-| OpenCode | 🔜 | 🔜 |
+| Platform | Hook | Skill | Notes |
+|----------|------|-------|-------|
+| Claude Code | ✅ | ✅ | Real-time `UserPromptSubmit` hook |
+| Codex | ✅ | ✅ | Pre-session sync via `sync-context.js` |
+| OpenCode | 🔜 | 🔜 | Planned |
 
-Codex doesn't support real-time hooks. Instead, run `node .anamnesis/hooks/sync-context.js` before each session to update `.anamnesis/context.md`.
+Codex doesn't support real-time hooks. Run `node .anamnesis/hooks/sync-context.js` before each session to update `.anamnesis/context.md`.
 
 To add support for a new platform, see [docs/platforms.md](docs/platforms.md).
 
@@ -195,10 +220,7 @@ To add support for a new platform, see [docs/platforms.md](docs/platforms.md).
 
 ## Installation
 
-### Requirements
-- Node.js >= 18
-
-### Steps
+**Requirements**: Node.js >= 18
 
 ```bash
 # Recommended: via npx (no clone needed)
@@ -206,18 +228,15 @@ npx anamnesis@github:syoslyot/anamnesis init --platform claude
 
 # Or clone and run directly
 git clone https://github.com/syoslyot/anamnesis
-cd anamnesis
 node setup.js --platform claude --target /path/to/your/project
 ```
-
-Options:
 
 | Flag | Values | Default | Description |
 |------|--------|---------|-------------|
 | `--platform` | `claude`, `codex` | prompted | Target AI agent platform |
 | `--target` | path | cwd | Project directory to install into |
 
-Setup automatically writes the anamnesis snippet into `CLAUDE.md` (or `AGENTS.md`). Start a new session when done.
+Setup writes the anamnesis snippet into `CLAUDE.md` (or `AGENTS.md`) and registers the hook. Start a new session when done.
 
 ---
 

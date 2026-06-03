@@ -22,12 +22,12 @@ Infer as much as possible from the current conversation:
 
 Draft a preview and ask once to confirm:
 
-> 幫你記錄這個假說：
+> Recording this hypothesis:
 >
-> **`loss-masking`** — Loss masking 是否顯著提升 F1？
-> 目前認為：有效，但幅度未知
+> **`loss-masking`** — Does applying loss only on assistant tokens significantly improve F1?
+> Current belief: Likely yes, but magnitude unknown
 >
-> 存檔，或有要調整的地方？
+> Save this, or anything to adjust?
 
 Save on approval (or if the user doesn't object). **Do not ask each field as a separate question** if context allows inference.
 
@@ -115,7 +115,7 @@ Then ask: should this conclusion update the parent hypothesis's `## {{belief}}`?
 
 Finally, read `.anamnesis/config.yaml` and check `reports.auto`:
 - If `true`: automatically run `am report <id>`
-- If `false` (default): ask once — "要我幫這個實驗寫份報告嗎？（之後也可以用 `am report <id>` 補做）"
+- If `false` (default): ask once — "Want me to write a report for this experiment? (You can also do it later with `am report <id>`)"
 
 ---
 
@@ -174,7 +174,7 @@ Read:
 
 Write the report following the prompt's structure. Save to `.anamnesis/reports/<id>.md`.
 
-Tell the user: "報告已存至 `.anamnesis/reports/<id>.md`。用 `am review <id>` 取得教授視角的審查。"
+Tell the user: "Report saved to `.anamnesis/reports/<id>.md`. Use `am review <id>` for a professor-style critique."
 
 ---
 
@@ -187,7 +187,7 @@ Read:
 
 Write the review following the prompt's structure. Save to `.anamnesis/reports/<id>-review.md`.
 
-Tell the user: "審查已存至 `.anamnesis/reports/<id>-review.md`。用 `am correct <id>` 根據審查意見修正報告。"
+Tell the user: "Review saved to `.anamnesis/reports/<id>-review.md`. Use `am correct <id>` to revise the report based on the feedback."
 
 ---
 
@@ -200,7 +200,7 @@ Read:
 
 Write the revised report following the prompt's structure. Save to `.anamnesis/reports/<id>-correct.md`.
 
-Tell the user: "修正版已存至 `.anamnesis/reports/<id>-correct.md`。"
+Tell the user: "Revised report saved to `.anamnesis/reports/<id>-correct.md`."
 
 ---
 
@@ -290,7 +290,7 @@ During normal conversation, proactively maintain anamnesis records when:
 - A conclusion changes understanding of a hypothesis → update the hypothesis
 
 **Creating new files**: Draft from context — infer the ID, question, and belief without asking upfront. Announce at the end of your response in one line:
-> （已記錄假說 `loss-masking`：Loss masking 是否顯著提升 F1？）
+> (Noted hypothesis `loss-masking`: Does loss masking significantly improve F1?)
 
 Do NOT interrupt the conversation with questions before creating. The user can correct with `am` commands later.
 

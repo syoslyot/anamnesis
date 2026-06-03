@@ -1,6 +1,6 @@
 # Anamnesis — Design Document
 
-Date: 2026-06-03
+Date: 2026-06-04
 
 ---
 
@@ -41,12 +41,12 @@ hypothesis
 
 experiment
   ├── id
-  ├── hypothesis (parent)
+  ├── hypothesis (parent hypothesis id)
   ├── status: planning | running | blocked | concluded
   ├── blocked_by (optional — reason or blocking experiment id)
   ├── n (optional — number of runs recorded via /am rerun)
   ├── metrics (optional — structured key-value pairs recorded via /am done)
-  ├── hypothesis (specific testable claim)
+  ├── testable claim
   ├── design (how to test)
   ├── results
   ├── runs (individual run log, one row per /am rerun call)
@@ -68,6 +68,11 @@ user-project/
 │   │   └── inject-context.js   # UserPromptSubmit hook (Node.js)
 │   ├── hypotheses/             # One .md file per hypothesis
 │   ├── experiments/            # One .md file per experiment
+│   ├── reports/                # AI-written reports, reviews, corrections
+│   ├── prompts/                # Customizable prompt templates
+│   │   ├── report.md
+│   │   ├── review.md
+│   │   └── correct.md
 │   └── config.yaml             # Anamnesis configuration
 └── .claude/
     ├── settings.json           # Hook registration (Claude Code)
@@ -82,56 +87,68 @@ Runs before every Claude message. Reads `.anamnesis/` and injects a compact cont
 
 - All `open` hypotheses (full first line)
 - `parked` hypotheses: not injected (deprioritized, visible only in `/am status`)
-- All `running` experiments (full first line)
-- All `blocked` experiments (first line + blocked_by reason if set)
-- Last 3 `concluded` experiments (one-line summary + icon)
-- `planning` experiments: not injected by default (configurable)
+- All `running` experiments (full first line; shows `(n=X)` if run count is set)
+- All `blocked` experiments (first line + `blocked_by` reason if set)
+- Last 3 `concluded` experiments (one-line summary + icon; shows `(n=X)` if set)
+- `planning` experiments: not injected by default (configurable via `include_planning`)
 
 This keeps token usage proportional to active work, not total project history.
 
 ### Auto-recording
 
-The installed CLAUDE.md snippet instructs the AI to proactively create and update `.anamnesis/` files during conversation — no user action required for routine record-keeping. Slash commands are the escape hatch for explicit control.
+The installed CLAUDE.md snippet instructs the AI to proactively create and update `.anamnesis/` files during conversation. New files are created silently and announced at the end of the response — no interruption to the research conversation. Slash commands are the escape hatch for explicit control.
+
+### Report workflow
+
+After an experiment concludes, the AI can produce a three-stage written record:
+
+1. **Report** (`/am report`) — structured lab-report style document
+2. **Review** (`/am review`) — professor-perspective critique of the report
+3. **Correct** (`/am correct`) — revised report responding to the review
+
+Each stage reads a customizable prompt from `.anamnesis/prompts/` and saves output to `.anamnesis/reports/`. Users can edit the prompt files to change tone, structure, or language.
 
 ### Slash commands (`/am`)
 
 | Command | Action |
 |---------|--------|
-| `/am hyp` | Create new hypothesis file (optional parent link) |
-| `/am exp` | Create new experiment file (status: planning) |
+| `/am hyp` | Create hypothesis (infers from context, draft+confirm) |
+| `/am exp` | Create experiment file (status: planning) |
 | `/am run` | Set experiment status → running |
-| `/am done` | Fill conclusion, set status → concluded |
-| `/am find` | Search across hypotheses and experiments |
-| `/am rerun` | Append a run to an experiment's run log; update `n:` counter |
-| `/am compare` | Print metrics comparison table for all concluded experiments under a hypothesis |
-| `/am park` | Set hypothesis status → parked (deprioritize without rejecting) |
+| `/am done` | Fill conclusion, set status → concluded; offer report |
+| `/am rerun` | Append a run to the run log; update `n:` counter |
+| `/am compare` | Metrics comparison table for concluded experiments under a hypothesis |
+| `/am report` | Write experiment report using `.anamnesis/prompts/report.md` |
+| `/am review` | Professor critique using `.anamnesis/prompts/review.md` |
+| `/am correct` | Revised report using `.anamnesis/prompts/correct.md` |
+| `/am park` | Set hypothesis status → parked |
 | `/am unpark` | Set hypothesis status → open |
 | `/am block` | Set experiment status → blocked (with optional reason) |
 | `/am unblock` | Set experiment status → running |
+| `/am find` | Search across hypotheses and experiments |
+| `/am status` | Full research overview |
 
 ---
 
 ## Platform Support
 
-### v0.1
+### v0.2
 - **Claude Code** — full support (hook + skill + CLAUDE.md snippet)
-- **Codex** — skill only (hook support deferred)
+- **Codex** — full support (pre-session sync hook + skill + AGENTS.md snippet)
 
-### Future
+### Planned
 - OpenCode, Cursor, Gemini CLI
 
 ---
 
 ## Distribution
 
-MVP: manual install via `setup.js` script.
-
 ```bash
-node setup.js --platform claude   # install for Claude Code
-node setup.js --platform codex    # install for Codex
+npx anamnesis@github:syoslyot/anamnesis init --platform claude
+npx anamnesis@github:syoslyot/anamnesis init --platform codex
 ```
 
-Future: `npx anamnesis init --platform claude`
+Or clone and run `setup.js` directly for local development.
 
 ---
 
@@ -142,18 +159,18 @@ Future: `npx anamnesis init --platform claude`
 ```markdown
 ---
 id: parallel-fusion
-status: open
-parent: fine-tune-vs-l1        # optional — omit if no parent
+status: open           # open | parked | confirmed | rejected
+parent: fine-tune-vs-l1   # optional — omit if no parent
 created: 2026-06-03
 updated: 2026-06-03
 ---
-## 核心問題
-Parallel Fusion 是否優於 Sequential 架構？
+## Research Question
+Is Parallel Fusion better than Sequential architecture?
 
-## 目前認為
-ft L2 輸出極端值導致 α 擾動無效，需重設計輸出層
+## Current Belief
+ft L2 outputs extreme values; α perturbation has no effect — output layer needs redesign
 
-## 相關實驗
+## Related Experiments
 - fusion-alpha-sweep (concluded)
 - calibration-test (planning)
 ```
@@ -173,15 +190,22 @@ metrics:                       # optional — structured results (set by /am don
 created: 2026-05-30
 updated: 2026-05-30
 ---
-## 假說
-只對 assistant token 計算 loss 是否顯著提升 F1？
+## Testable Claim
+Does computing loss only on assistant tokens significantly improve F1?
 
-## 設計
-修改 collate_fn，其他超參數不變，重跑 3 epochs
+## Design
+Modify collate_fn, keep all other hyperparameters fixed, re-run 3 epochs
 
-## 結果
-F1 69% → 93%，Epoch 3 loss 0.0163
+## Results
+F1 69% → 93%, Epoch 3 loss 0.0163
 
-## 結論
-✅ 成立，loss masking 是最關鍵的訓練 bug
+## Run Log
+| Date | Result |
+|------|--------|
+| 2026-05-30 | F1 0.91, loss 0.021 |
+| 2026-05-31 | F1 0.93, loss 0.0163 |
+| 2026-06-01 | F1 0.93, loss 0.0161 |
+
+## Conclusion
+✅ Confirmed — loss masking was the most critical training bug
 ```
