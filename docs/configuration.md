@@ -3,11 +3,14 @@
 Anamnesis reads `.anamnesis/config.yaml` in the user's project directory. All fields are optional; defaults are shown below.
 
 ```yaml
-version: "0.1"
+version: "0.2"
 
 inject:
   max_concluded: 3        # how many recent concluded experiments to show
-  include_planning: false  # whether to show planning (not-yet-started) experiments
+  include_planning: false # whether to show planning (not-yet-started) experiments
+
+reports:
+  auto: false             # true: generate report automatically after /am done
 
 sections:
   question:    "核心問題"   # hypothesis: core research question
@@ -42,12 +45,21 @@ When `true`, experiments with `status: planning` are included in the injected co
 
 ---
 
+## `reports.auto`
+
+**Type**: boolean  
+**Default**: `false`
+
+When `false` (default), the AI asks once after `/am done` whether to write a report. When `true`, `/am report` runs automatically as part of the conclusion flow.
+
+---
+
 ## `sections`
 
 **Type**: map of string → string  
 **Default**: Chinese headers (see above)
 
-Controls the markdown section header names used in all `.anamnesis/` files. The hook reads this at runtime to locate the conclusion section; the `/am` skill uses these names when creating new files.
+Controls the markdown section header names used in all `.anamnesis/` files. The hook reads `sections.conclusion` at runtime to locate conclusions; the `/am` skill uses all names when creating new files.
 
 To use a different language or terminology, edit the values in `config.yaml` after install:
 
@@ -69,6 +81,6 @@ Then regenerate the skill to match:
 node /path/to/anamnesis/setup.js --platform claude --target .
 ```
 
-(Setup skips existing files in `.anamnesis/` but always regenerates the skill.)
+Setup skips existing files in `.anamnesis/` but always regenerates the skill, so section names in the generated `SKILL.md` stay in sync with your config.
 
-Any key not specified falls back to the default Chinese value. Only `conclusion` is used by the hook for parsing; the rest are used by the AI skill for file creation.
+Any key not specified falls back to the default Chinese value.
