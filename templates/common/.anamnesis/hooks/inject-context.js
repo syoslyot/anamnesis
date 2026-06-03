@@ -46,9 +46,18 @@ function buildContext(anamnesisDir) {
   const experiments = loadFiles(path.join(anamnesisDir, 'experiments'), config);
   const running = experiments.filter(e => e.meta.status === 'running');
   if (running.length) {
-    sections.push('Running Experiments:\n' + running.map(e =>
-      `  • [${e.meta.id}] ${e.firstLine}`
-    ).join('\n'));
+    sections.push('Running Experiments:\n' + running.map(e => {
+      const nTag = e.meta.n ? ` (n=${e.meta.n})` : '';
+      return `  • [${e.meta.id}] ${e.firstLine}${nTag}`;
+    }).join('\n'));
+  }
+
+  const blocked = experiments.filter(e => e.meta.status === 'blocked');
+  if (blocked.length) {
+    sections.push('Blocked Experiments:\n' + blocked.map(e => {
+      const reason = e.meta.blocked_by ? ` — ${e.meta.blocked_by}` : '';
+      return `  ⏸ [${e.meta.id}] ${e.firstLine}${reason}`;
+    }).join('\n'));
   }
 
   if (config.include_planning) {
@@ -65,9 +74,10 @@ function buildContext(anamnesisDir) {
     .sort((a, b) => (b.meta.updated || '').localeCompare(a.meta.updated || ''))
     .slice(0, config.max_concluded);
   if (concluded.length) {
-    sections.push('Recent Conclusions:\n' + concluded.map(e =>
-      `  [${e.meta.id}] ${e.conclusion || e.firstLine}`
-    ).join('\n'));
+    sections.push('Recent Conclusions:\n' + concluded.map(e => {
+      const nTag = e.meta.n ? ` (n=${e.meta.n})` : '';
+      return `  [${e.meta.id}] ${e.conclusion || e.firstLine}${nTag}`;
+    }).join('\n'));
   }
 
   if (!sections.length) return null;
@@ -82,8 +92,11 @@ const DEFAULT_SECTIONS = {
   hypothesis: '假說',
   design:     '設計',
   results:    '結果',
+  runs:       '執行記錄',
   conclusion: '結論',
 };
+
+const NESTED_KEYS = new Set(['metrics']);
 
 function loadConfig(anamnesisDir) {
   const defaults = {
@@ -152,10 +165,26 @@ function parseFrontmatter(content) {
   if (end === -1) return { meta: {}, body: content };
 
   const meta = {};
+  let nestedKey = null;
   for (const line of content.slice(4, end).split('\n')) {
+    if (nestedKey && /^\s+\S/.test(line)) {
+      const colon = line.indexOf(':');
+      if (colon !== -1) {
+        meta[nestedKey][line.slice(0, colon).trim()] = line.slice(colon + 1).trim();
+      }
+      continue;
+    }
+    nestedKey = null;
     const colon = line.indexOf(':');
     if (colon === -1) continue;
-    meta[line.slice(0, colon).trim()] = line.slice(colon + 1).trim();
+    const key = line.slice(0, colon).trim();
+    const value = line.slice(colon + 1).trim();
+    if (value === '' && NESTED_KEYS.has(key)) {
+      meta[key] = {};
+      nestedKey = key;
+    } else {
+      meta[key] = value;
+    }
   }
   return { meta, body: content.slice(end + 5) };
 }

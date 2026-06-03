@@ -88,6 +88,17 @@ describe('parseFrontmatter', () => {
     assert.equal(meta.url, 'http://example.com');
   });
 
+  test('parses nested metrics block', () => {
+    const { meta } = parseFrontmatter('---\nid: exp-1\nmetrics:\n  f1: 0.93\n  loss: 0.016\n---\nbody');
+    assert.deepEqual(meta.metrics, { f1: '0.93', loss: '0.016' });
+  });
+
+  test('does not treat other empty-value keys as nested', () => {
+    const { meta } = parseFrontmatter('---\nblocked_by:\nstatus: running\n---\nbody');
+    assert.equal(meta.blocked_by, '');
+    assert.equal(meta.status, 'running');
+  });
+
   test('skips lines without colon', () => {
     const { meta } = parseFrontmatter('---\nid: test\nno-colon-line\n---\nbody');
     assert.equal(meta.id, 'test');
@@ -213,12 +224,36 @@ describe('buildContext', () => {
     assert.equal(buildContext(dir), null);
   });
 
+  test('does not include parked hypotheses', () => {
+    const dir = tmpDir();
+    makeHypothesis(dir, 'hyp-parked', { status: 'parked' });
+    assert.equal(buildContext(dir), null);
+  });
+
   test('includes running experiments', () => {
     const dir = tmpDir();
     makeExperiment(dir, 'exp-1', { status: 'running' });
     const ctx = buildContext(dir);
     assert.ok(ctx.includes('Running Experiments'));
     assert.ok(ctx.includes('[exp-1]'));
+  });
+
+  test('shows n= tag for running experiments when n is set', () => {
+    const dir = tmpDir();
+    write(dir, 'experiments/exp-n.md',
+      `---\nid: exp-n\nhypothesis: hyp-1\nstatus: running\nn: 3\nupdated: 2026-06-01\n---\n## 假說\nTest claim\n\n## 結論\n(pending)\n`
+    );
+    const ctx = buildContext(dir);
+    assert.ok(ctx.includes('(n=3)'));
+  });
+
+  test('shows n= tag for concluded experiments when n is set', () => {
+    const dir = tmpDir();
+    write(dir, 'experiments/exp-n.md',
+      `---\nid: exp-n\nhypothesis: hyp-1\nstatus: concluded\nn: 2\nupdated: 2026-06-01\n---\n## 假說\nTest claim\n\n## 結論\n✅ confirmed\n`
+    );
+    const ctx = buildContext(dir);
+    assert.ok(ctx.includes('(n=2)'));
   });
 
   test('excludes planning experiments by default', () => {
@@ -268,6 +303,23 @@ describe('buildContext', () => {
     const ctx = buildContext(dir);
     assert.ok(ctx.startsWith('<anamnesis>'));
     assert.ok(ctx.endsWith('</anamnesis>'));
+  });
+
+  test('includes blocked experiments', () => {
+    const dir = tmpDir();
+    makeExperiment(dir, 'exp-blocked', { status: 'blocked' });
+    const ctx = buildContext(dir);
+    assert.ok(ctx.includes('Blocked Experiments'));
+    assert.ok(ctx.includes('[exp-blocked]'));
+  });
+
+  test('shows blocked_by reason in context', () => {
+    const dir = tmpDir();
+    write(dir, 'experiments/exp-stalled.md',
+      `---\nid: exp-stalled\nhypothesis: hyp-1\nstatus: blocked\nblocked_by: waiting for GPU\nupdated: 2026-06-01\n---\n## 假說\nTest claim\n\n## 結論\n(pending)\n`
+    );
+    const ctx = buildContext(dir);
+    assert.ok(ctx.includes('waiting for GPU'));
   });
 
   test('conclusion does not double-prefix emoji', () => {

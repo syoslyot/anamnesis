@@ -44,6 +44,12 @@ npx anamnesis@github:syoslyot/anamnesis init --platform claude
 | `/am done` | Record results and conclusion |
 | `/am find <keyword>` | Search past hypotheses and experiments |
 | `/am status` | Overview of all hypotheses and experiments |
+| `/am rerun` | Append a run to an experiment's run log |
+| `/am compare` | Compare metrics across concluded experiments under a hypothesis |
+| `/am park` | Deprioritize a hypothesis without rejecting it |
+| `/am unpark` | Bring a parked hypothesis back to active |
+| `/am block` | Mark an experiment as blocked (with optional reason) |
+| `/am unblock` | Resume a blocked experiment |
 
 No commands required for routine use — the AI proactively creates and updates records during normal conversation.
 
@@ -97,7 +103,8 @@ Section names are configurable. The defaults are shown below.
 ```markdown
 ---
 id: parallel-fusion
-status: open          # open | confirmed | rejected
+status: open          # open | parked | confirmed | rejected
+parent: fine-tune-vs-l1  # optional — omit if no parent hypothesis
 created: 2026-06-03
 updated: 2026-06-03
 ---
@@ -117,7 +124,11 @@ ft L2 輸出極端值，α 擾動無效，需重設計輸出層
 ---
 id: loss-masking-fix
 hypothesis: fine-tune-vs-l1
-status: concluded     # planning | running | concluded
+status: concluded     # planning | running | blocked | concluded
+n: 3                  # optional — run count, managed by /am rerun
+metrics:              # optional — structured key-value results
+  f1: 0.93
+  loss: 0.0163
 created: 2026-05-30
 updated: 2026-05-30
 ---
@@ -129,6 +140,13 @@ updated: 2026-05-30
 
 ## 結果
 F1 69% → 93%，Epoch 3 loss 0.0163
+
+## 執行記錄
+| Date | Result |
+|------|--------|
+| 2026-05-30 | F1 0.91, loss 0.021 |
+| 2026-05-31 | F1 0.93, loss 0.0163 |
+| 2026-06-01 | F1 0.93, loss 0.0161 |
 
 ## 結論
 ✅ 成立，loss masking 是最關鍵的訓練 bug
