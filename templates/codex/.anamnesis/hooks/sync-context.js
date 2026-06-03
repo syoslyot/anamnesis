@@ -13,19 +13,21 @@
 const fs = require('fs');
 const path = require('path');
 
-const anamnesisDir = path.join(process.cwd(), '.anamnesis');
-const outputPath = path.join(anamnesisDir, 'context.md');
+function main() {
+  const anamnesisDir = path.join(process.cwd(), '.anamnesis');
+  const outputPath = path.join(anamnesisDir, 'context.md');
 
-if (!fs.existsSync(anamnesisDir)) {
-  console.error('No .anamnesis directory found. Run setup first.');
-  process.exit(1);
+  if (!fs.existsSync(anamnesisDir)) {
+    console.error('No .anamnesis directory found. Run setup first.');
+    process.exit(1);
+  }
+
+  const config = loadConfig(anamnesisDir);
+  const context = buildContext(anamnesisDir, config);
+
+  fs.writeFileSync(outputPath, context);
+  console.log(`✅ Updated .anamnesis/context.md`);
 }
-
-const config = loadConfig(anamnesisDir);
-const context = buildContext(anamnesisDir, config);
-
-fs.writeFileSync(outputPath, context);
-console.log(`✅ Updated .anamnesis/context.md`);
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -133,4 +135,10 @@ function parseFrontmatter(content) {
     meta[line.slice(0, colon).trim()] = line.slice(colon + 1).trim();
   }
   return { meta, body: content.slice(end + 5) };
+}
+
+if (require.main === module) {
+  main();
+} else {
+  module.exports = { parseFrontmatter, parseFile, loadFiles, loadConfig, buildContext };
 }

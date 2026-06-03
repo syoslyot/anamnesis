@@ -144,4 +144,8 @@ function readStdin() {
   });
 }
 
-main().catch(() => process.exit(0));
+if (require.main === module) {
+  main().catch(() => process.exit(0));
+} else {
+  module.exports = { parseFrontmatter, parseFile, loadFiles, loadConfig, buildContext };
+}
