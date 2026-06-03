@@ -24,12 +24,10 @@ At every session start, the AI reads the current state of your research and pick
 ## Quick Start
 
 ```bash
-# Install into your project
-node setup.js --platform claude
+# Install into your project (writes CLAUDE.md automatically)
+npx anamnesis@github:syoslyot/anamnesis init --platform claude
 
-# Add the snippet to your CLAUDE.md (shown after setup)
-
-# Start your first session — the AI will suggest creating a hypothesis
+# Start a new Claude Code session — the AI will suggest creating a hypothesis
 # Or explicitly:
 /am hyp
 ```
@@ -80,8 +78,8 @@ Running Experiments:
   • [calibration-test] 測試 L2 logit 是否能作為連續分數
 
 Recent Conclusions:
-  ✅ [loss-masking-fix] loss masking 是最關鍵的訓練 bug
-  ❌ [fusion-alpha-sweep] α 無法改變 Fusion 結果
+  [loss-masking-fix] ✅ 成立，loss masking 是最關鍵的訓練 bug
+  [fusion-alpha-sweep] ❌ α 無法改變 Fusion 結果
 
 </anamnesis>
 ```
@@ -91,6 +89,8 @@ Token-efficient: only injects active work, not the full history.
 ---
 
 ## File Format
+
+Section names are configurable. The defaults are shown below.
 
 ### Hypothesis
 
@@ -144,7 +144,18 @@ Settings live in `.anamnesis/config.yaml` inside your project:
 inject:
   max_concluded: 3        # recent concluded experiments to show in context
   include_planning: false # show not-yet-started experiments in context
+
+sections:
+  question:   "核心問題"  # rename to any language or terminology
+  belief:     "目前認為"
+  related:    "相關實驗"
+  hypothesis: "假說"
+  design:     "設計"
+  results:    "結果"
+  conclusion: "結論"
 ```
+
+The hook reads `sections.conclusion` at runtime to locate the conclusion in each experiment file. All other section names are used by the AI skill when creating new files. Change any value and the whole system adapts — no code changes needed.
 
 See [docs/configuration.md](docs/configuration.md) for the full reference.
 
@@ -187,7 +198,6 @@ Options:
 |------|--------|---------|-------------|
 | `--platform` | `claude`, `codex` | prompted | Target AI agent platform |
 | `--target` | path | cwd | Project directory to install into |
-| `--language` | `zh`, `en` | `zh` | Language for skill templates |
 
 Setup automatically writes the anamnesis snippet into `CLAUDE.md` (or `AGENTS.md`). Start a new session when done.
 
