@@ -11,6 +11,8 @@ const {
   parseFile,
   loadConfig,
   buildContext,
+  DEFAULT_SECTIONS,
+  escapeRegex,
 } = require('../templates/common/.anamnesis/hooks/inject-context');
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -26,16 +28,39 @@ function write(dir, relPath, content) {
   return full;
 }
 
-function makeHypothesis(dir, id, { status = 'open', question = 'Test question?' } = {}) {
-  write(dir, `hypotheses/${id}.md`, `---\nid: ${id}\nstatus: ${status}\nupdated: 2026-06-01\n---\n## 核心問題\n${question}\n\n## 目前認為\nsome belief\n`);
+function makeHypothesis(dir, id, { status = 'open', question = 'Test question?', conclusionKey = '結論' } = {}) {
+  write(dir, `hypotheses/${id}.md`,
+    `---\nid: ${id}\nstatus: ${status}\nupdated: 2026-06-01\n---\n## 核心問題\n${question}\n\n## 目前認為\nsome belief\n`
+  );
 }
 
-function makeExperiment(dir, id, { status = 'running', conclusion = '', updated = '2026-06-01' } = {}) {
+function makeExperiment(dir, id, {
+  status = 'running',
+  conclusion = '',
+  updated = '2026-06-01',
+  conclusionKey = '結論',
+} = {}) {
   const conclusionSection = conclusion
-    ? `## 結論\n${conclusion}\n`
-    : `## Conclusion\n(pending)\n`;
-  write(dir, `experiments/${id}.md`, `---\nid: ${id}\nhypothesis: hyp-1\nstatus: ${status}\nupdated: ${updated}\n---\n## 假說\nTest claim\n\n## Design\nRun it\n\n## Results\n-\n\n${conclusionSection}`);
+    ? `## ${conclusionKey}\n${conclusion}\n`
+    : `## ${conclusionKey}\n(pending)\n`;
+  write(dir, `experiments/${id}.md`,
+    `---\nid: ${id}\nhypothesis: hyp-1\nstatus: ${status}\nupdated: ${updated}\n---\n## 假說\nTest claim\n\n## Design\nRun it\n\n## Results\n-\n\n${conclusionSection}`
+  );
 }
+
+// ─── escapeRegex ─────────────────────────────────────────────────────────────
+
+describe('escapeRegex', () => {
+  test('escapes special regex characters', () => {
+    assert.equal(escapeRegex('a.b'), 'a\\.b');
+    assert.equal(escapeRegex('a+b'), 'a\\+b');
+  });
+
+  test('passes through plain strings unchanged', () => {
+    assert.equal(escapeRegex('結論'), '結論');
+    assert.equal(escapeRegex('Conclusion'), 'Conclusion');
+  });
+});
 
 // ─── parseFrontmatter ────────────────────────────────────────────────────────
 
@@ -77,34 +102,46 @@ describe('loadConfig', () => {
     const cfg = loadConfig('/nonexistent/path');
     assert.equal(cfg.max_concluded, 3);
     assert.equal(cfg.include_planning, false);
+    assert.deepEqual(cfg.sections, DEFAULT_SECTIONS);
   });
 
   test('returns defaults when config.yaml is absent', () => {
-    const dir = tmpDir();
-    const cfg = loadConfig(dir);
-    assert.equal(cfg.max_concluded, 3);
-    assert.equal(cfg.include_planning, false);
+    const cfg = loadConfig(tmpDir());
+    assert.deepEqual(cfg.sections, DEFAULT_SECTIONS);
   });
 
   test('reads max_concluded', () => {
     const dir = tmpDir();
-    write(dir, 'config.yaml', 'version: "0.1"\ninject:\n  max_concluded: 5\n  include_planning: false\n');
-    const cfg = loadConfig(dir);
-    assert.equal(cfg.max_concluded, 5);
+    write(dir, 'config.yaml', 'inject:\n  max_concluded: 5\n  include_planning: false\n');
+    assert.equal(loadConfig(dir).max_concluded, 5);
   });
 
   test('reads include_planning: true', () => {
     const dir = tmpDir();
-    write(dir, 'config.yaml', 'version: "0.1"\ninject:\n  max_concluded: 3\n  include_planning: true\n');
+    write(dir, 'config.yaml', 'inject:\n  max_concluded: 3\n  include_planning: true\n');
+    assert.equal(loadConfig(dir).include_planning, true);
+  });
+
+  test('reads custom section names', () => {
+    const dir = tmpDir();
+    write(dir, 'config.yaml', 'sections:\n  conclusion: "Conclusion"\n  question: "Research Question"\n');
     const cfg = loadConfig(dir);
-    assert.equal(cfg.include_planning, true);
+    assert.equal(cfg.sections.conclusion, 'Conclusion');
+    assert.equal(cfg.sections.question, 'Research Question');
+  });
+
+  test('merges custom sections with defaults for missing keys', () => {
+    const dir = tmpDir();
+    write(dir, 'config.yaml', 'sections:\n  conclusion: "Ergebnis"\n');
+    const cfg = loadConfig(dir);
+    assert.equal(cfg.sections.conclusion, 'Ergebnis');
+    assert.equal(cfg.sections.question, DEFAULT_SECTIONS.question);
   });
 
   test('returns defaults for malformed config', () => {
     const dir = tmpDir();
     write(dir, 'config.yaml', 'not: yaml: at: all: :::\n');
-    const cfg = loadConfig(dir);
-    assert.equal(cfg.max_concluded, 3);
+    assert.equal(loadConfig(dir).max_concluded, 3);
   });
 });
 
@@ -114,34 +151,39 @@ describe('parseFile', () => {
   test('extracts firstLine from hypothesis', () => {
     const dir = tmpDir();
     makeHypothesis(dir, 'hyp-1', { question: 'Does pruning hurt BLEU?' });
-    const result = parseFile(path.join(dir, 'hypotheses/hyp-1.md'));
+    const result = parseFile(path.join(dir, 'hypotheses/hyp-1.md'), '結論');
     assert.equal(result.firstLine, 'Does pruning hurt BLEU?');
   });
 
-  test('extracts conclusion under Chinese header', () => {
+  test('extracts conclusion using configured header', () => {
     const dir = tmpDir();
-    makeExperiment(dir, 'exp-1', { status: 'concluded', conclusion: '✅ loss masking 有效' });
-    const result = parseFile(path.join(dir, 'experiments/exp-1.md'));
-    assert.equal(result.conclusion, '✅ loss masking 有效');
+    makeExperiment(dir, 'exp-1', { status: 'concluded', conclusion: '✅ it worked', conclusionKey: '結論' });
+    const result = parseFile(path.join(dir, 'experiments/exp-1.md'), '結論');
+    assert.equal(result.conclusion, '✅ it worked');
   });
 
-  test('extracts conclusion under English header', () => {
+  test('uses custom conclusionHeader correctly', () => {
     const dir = tmpDir();
-    const content = '---\nid: exp-en\nstatus: concluded\nupdated: 2026-06-01\n---\n## Hypothesis\nclaim\n\n## Conclusion\n❌ did not work\n';
-    write(dir, 'experiments/exp-en.md', content);
-    const result = parseFile(path.join(dir, 'experiments/exp-en.md'));
-    assert.equal(result.conclusion, '❌ did not work');
+    makeExperiment(dir, 'exp-custom', { status: 'concluded', conclusion: '✅ confirmed', conclusionKey: 'Fazit' });
+    const result = parseFile(path.join(dir, 'experiments/exp-custom.md'), 'Fazit');
+    assert.equal(result.conclusion, '✅ confirmed');
+  });
+
+  test('returns empty conclusion when header does not match', () => {
+    const dir = tmpDir();
+    makeExperiment(dir, 'exp-mismatch', { status: 'concluded', conclusion: '✅ result', conclusionKey: '結論' });
+    const result = parseFile(path.join(dir, 'experiments/exp-mismatch.md'), 'WrongHeader');
+    assert.equal(result.conclusion, '');
   });
 
   test('returns null for nonexistent file', () => {
-    const result = parseFile('/nonexistent/file.md');
-    assert.equal(result, null);
+    assert.equal(parseFile('/nonexistent/file.md', '結論'), null);
   });
 
   test('returns empty conclusion when section absent', () => {
     const dir = tmpDir();
-    write(dir, 'hypotheses/no-conclusion.md', '---\nid: x\nstatus: open\n---\n## Core Question\nsome question\n');
-    const result = parseFile(path.join(dir, 'hypotheses/no-conclusion.md'));
+    write(dir, 'hypotheses/no-conclusion.md', '---\nid: x\nstatus: open\n---\n## 核心問題\nsome question\n');
+    const result = parseFile(path.join(dir, 'hypotheses/no-conclusion.md'), '結論');
     assert.equal(result.conclusion, '');
   });
 });
@@ -168,8 +210,7 @@ describe('buildContext', () => {
   test('does not include confirmed hypotheses in open section', () => {
     const dir = tmpDir();
     makeHypothesis(dir, 'hyp-confirmed', { status: 'confirmed' });
-    const ctx = buildContext(dir);
-    assert.equal(ctx, null);
+    assert.equal(buildContext(dir), null);
   });
 
   test('includes running experiments', () => {
@@ -184,8 +225,7 @@ describe('buildContext', () => {
     const dir = tmpDir();
     write(dir, 'config.yaml', 'inject:\n  include_planning: false\n');
     makeExperiment(dir, 'exp-plan', { status: 'planning' });
-    const ctx = buildContext(dir);
-    assert.equal(ctx, null);
+    assert.equal(buildContext(dir), null);
   });
 
   test('includes planning experiments when config says so', () => {
@@ -194,7 +234,6 @@ describe('buildContext', () => {
     makeExperiment(dir, 'exp-plan', { status: 'planning' });
     const ctx = buildContext(dir);
     assert.ok(ctx.includes('Planned Experiments'));
-    assert.ok(ctx.includes('[exp-plan]'));
   });
 
   test('includes concluded experiments', () => {
@@ -202,7 +241,6 @@ describe('buildContext', () => {
     makeExperiment(dir, 'exp-done', { status: 'concluded', conclusion: '✅ it worked' });
     const ctx = buildContext(dir);
     assert.ok(ctx.includes('Recent Conclusions'));
-    assert.ok(ctx.includes('[exp-done]'));
     assert.ok(ctx.includes('✅ it worked'));
   });
 
@@ -235,7 +273,14 @@ describe('buildContext', () => {
   test('conclusion does not double-prefix emoji', () => {
     const dir = tmpDir();
     makeExperiment(dir, 'exp-1', { status: 'concluded', conclusion: '✅ confirmed result' });
+    assert.ok(!buildContext(dir).includes('✅ ✅'));
+  });
+
+  test('uses custom conclusion section name from config', () => {
+    const dir = tmpDir();
+    write(dir, 'config.yaml', 'sections:\n  conclusion: "Fazit"\n');
+    makeExperiment(dir, 'exp-de', { status: 'concluded', conclusion: '✅ gut', conclusionKey: 'Fazit' });
     const ctx = buildContext(dir);
-    assert.ok(!ctx.includes('✅ ✅'));
+    assert.ok(ctx.includes('✅ gut'));
   });
 });

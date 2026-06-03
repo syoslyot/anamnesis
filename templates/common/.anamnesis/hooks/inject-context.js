@@ -35,7 +35,7 @@ function buildContext(anamnesisDir) {
   const config = loadConfig(anamnesisDir);
   const sections = [];
 
-  const hypotheses = loadFiles(path.join(anamnesisDir, 'hypotheses'));
+  const hypotheses = loadFiles(path.join(anamnesisDir, 'hypotheses'), config);
   const open = hypotheses.filter(h => h.meta.status === 'open');
   if (open.length) {
     sections.push('Open Hypotheses:\n' + open.map(h =>
@@ -43,7 +43,7 @@ function buildContext(anamnesisDir) {
     ).join('\n'));
   }
 
-  const experiments = loadFiles(path.join(anamnesisDir, 'experiments'));
+  const experiments = loadFiles(path.join(anamnesisDir, 'experiments'), config);
   const running = experiments.filter(e => e.meta.status === 'running');
   if (running.length) {
     sections.push('Running Experiments:\n' + running.map(e =>
@@ -75,32 +75,54 @@ function buildContext(anamnesisDir) {
   return ['<anamnesis>', ...sections, '</anamnesis>'].join('\n\n');
 }
 
+const DEFAULT_SECTIONS = {
+  question:   '核心問題',
+  belief:     '目前認為',
+  related:    '相關實驗',
+  hypothesis: '假說',
+  design:     '設計',
+  results:    '結果',
+  conclusion: '結論',
+};
+
 function loadConfig(anamnesisDir) {
-  const defaults = { max_concluded: 3, include_planning: false };
+  const defaults = {
+    max_concluded: 3,
+    include_planning: false,
+    sections: DEFAULT_SECTIONS,
+  };
   const configPath = path.join(anamnesisDir, 'config.yaml');
   if (!fs.existsSync(configPath)) return defaults;
   try {
     const text = fs.readFileSync(configPath, 'utf-8');
     const maxMatch = text.match(/max_concluded:\s*(\d+)/);
     const planningMatch = text.match(/include_planning:\s*(true|false)/);
+
+    const sections = { ...DEFAULT_SECTIONS };
+    for (const key of Object.keys(DEFAULT_SECTIONS)) {
+      const m = text.match(new RegExp(`${key}:\\s*"([^"]+)"`));
+      if (m) sections[key] = m[1];
+    }
+
     return {
       max_concluded: maxMatch ? parseInt(maxMatch[1], 10) : defaults.max_concluded,
       include_planning: planningMatch ? planningMatch[1] === 'true' : defaults.include_planning,
+      sections,
     };
   } catch {
     return defaults;
   }
 }
 
-function loadFiles(dir) {
+function loadFiles(dir, config) {
   if (!fs.existsSync(dir)) return [];
   return fs.readdirSync(dir)
     .filter(f => f.endsWith('.md'))
-    .map(f => parseFile(path.join(dir, f)))
+    .map(f => parseFile(path.join(dir, f), config.sections.conclusion))
     .filter(Boolean);
 }
 
-function parseFile(filePath) {
+function parseFile(filePath, conclusionHeader) {
   try {
     const content = fs.readFileSync(filePath, 'utf-8');
     const { meta, body } = parseFrontmatter(content);
@@ -108,7 +130,8 @@ function parseFile(filePath) {
     const bodyLines = body.split('\n').filter(l => l.trim());
     const firstLine = bodyLines.find(l => !l.startsWith('#'))?.trim() || '';
 
-    const conclusionMatch = body.match(/^## (?:結論|Conclusion)\s*\n([\s\S]*?)(?=\n##|$)/m);
+    const re = new RegExp(`^## ${escapeRegex(conclusionHeader)}\\s*\\n([\\s\\S]*?)(?=\\n##|$)`, 'm');
+    const conclusionMatch = body.match(re);
     const conclusion = conclusionMatch
       ? conclusionMatch[1].split('\n').find(l => l.trim())?.trim() || ''
       : '';
@@ -117,6 +140,10 @@ function parseFile(filePath) {
   } catch {
     return null;
   }
+}
+
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function parseFrontmatter(content) {
@@ -147,5 +174,5 @@ function readStdin() {
 if (require.main === module) {
   main().catch(() => process.exit(0));
 } else {
-  module.exports = { parseFrontmatter, parseFile, loadFiles, loadConfig, buildContext };
+  module.exports = { parseFrontmatter, parseFile, loadFiles, loadConfig, buildContext, DEFAULT_SECTIONS, escapeRegex };
 }

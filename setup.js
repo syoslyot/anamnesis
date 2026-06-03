@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
  * Anamnesis setup script
- * Usage: anamnesis init [--platform claude|codex] [--target /path] [--language en|zh]
- *        node setup.js [--platform claude|codex] [--target /path] [--language en|zh]
+ * Usage: anamnesis init [--platform claude|codex] [--target /path]
+ *        node setup.js [--platform claude|codex] [--target /path]
  */
 
 'use strict';
@@ -13,14 +13,21 @@ const readline = require('readline');
 const { execSync } = require('child_process');
 
 const PLATFORMS = ['claude', 'codex'];
-const LANGUAGES = ['en', 'zh'];
 const SCRIPT_DIR = path.dirname(fs.realpathSync(__filename));
 const TEMPLATES = path.join(SCRIPT_DIR, 'templates');
 
+const DEFAULT_SECTIONS = {
+  question:   '核心問題',
+  belief:     '目前認為',
+  related:    '相關實驗',
+  hypothesis: '假說',
+  design:     '設計',
+  results:    '結果',
+  conclusion: '結論',
+};
+
 async function main() {
   const argv = process.argv.slice(2);
-
-  // Support: anamnesis init [...] or node setup.js [...]
   const args = parseArgs(argv[0] === 'init' ? argv.slice(1) : argv);
 
   if (args.help) {
@@ -30,15 +37,9 @@ async function main() {
 
   const target = args.target ? path.resolve(args.target) : process.cwd();
   const platform = args.platform || await askPlatform();
-  const language = args.language || 'zh';
 
   if (!PLATFORMS.includes(platform)) {
     console.error(`Unknown platform: ${platform}. Choose: ${PLATFORMS.join(', ')}`);
-    process.exit(1);
-  }
-
-  if (!LANGUAGES.includes(language)) {
-    console.error(`Unknown language: ${language}. Choose: ${LANGUAGES.join(', ')}`);
     process.exit(1);
   }
 
@@ -48,13 +49,14 @@ async function main() {
     console.warn('     Consider running `git init` first.\n');
   }
 
-  console.log(`\nInstalling anamnesis for ${platform} (language: ${language}) in: ${target}\n`);
+  console.log(`\nInstalling anamnesis for ${platform} in: ${target}\n`);
 
   copyDir(path.join(TEMPLATES, 'common', '.anamnesis'), path.join(target, '.anamnesis'));
-  copyDir(path.join(TEMPLATES, platform, 'skills'), skillsDir(platform, target));
+
+  const sections = readInstalledSections(target);
+  generateSkill(platform, target, sections);
 
   if (platform === 'claude') {
-    installClaudeSkillLanguage(target, language);
     installHook(target);
     printClaudeMdHint(target);
   }
@@ -69,6 +71,39 @@ async function main() {
 
   console.log('\n✅ Anamnesis installed.');
   console.log('   Start by running /am hyp to record your first research question.\n');
+}
+
+// Reads section names from the installed config.yaml (or returns defaults).
+function readInstalledSections(target) {
+  const configPath = path.join(target, '.anamnesis', 'config.yaml');
+  if (!fs.existsSync(configPath)) return DEFAULT_SECTIONS;
+  try {
+    const text = fs.readFileSync(configPath, 'utf-8');
+    const sections = { ...DEFAULT_SECTIONS };
+    for (const key of Object.keys(DEFAULT_SECTIONS)) {
+      const m = text.match(new RegExp(`${key}:\\s*"([^"]+)"`));
+      if (m) sections[key] = m[1];
+    }
+    return sections;
+  } catch {
+    return DEFAULT_SECTIONS;
+  }
+}
+
+// Generates SKILL.md from SKILL.template.md, substituting section names.
+function generateSkill(platform, target, sections) {
+  const templatePath = path.join(TEMPLATES, platform, 'skills', 'am', 'SKILL.template.md');
+  if (!fs.existsSync(templatePath)) return;
+
+  let content = fs.readFileSync(templatePath, 'utf-8');
+  for (const [key, value] of Object.entries(sections)) {
+    content = content.replaceAll(`{{${key}}}`, value);
+  }
+
+  const destDir = path.join(skillsDir(platform, target), 'am');
+  fs.mkdirSync(destDir, { recursive: true });
+  fs.writeFileSync(path.join(destDir, 'SKILL.md'), content);
+  console.log(`  created  ${path.relative(process.cwd(), path.join(destDir, 'SKILL.md'))}`);
 }
 
 function skillsDir(platform, target) {
@@ -101,22 +136,6 @@ function copyDir(src, dest) {
       console.log(`  skipped  ${path.relative(process.cwd(), destPath)} (already exists)`);
     }
   }
-}
-
-// Installs the language-appropriate skill file, overwriting if the wrong language is present.
-function installClaudeSkillLanguage(target, language) {
-  const skillDir = path.join(target, '.claude', 'skills', 'am');
-  const destSkill = path.join(skillDir, 'SKILL.md');
-
-  if (language === 'en') {
-    const enSrc = path.join(TEMPLATES, 'claude', 'skills', 'am', 'SKILL.en.md');
-    if (fs.existsSync(enSrc)) {
-      fs.mkdirSync(skillDir, { recursive: true });
-      fs.copyFileSync(enSrc, destSkill);
-      console.log(`  updated  .claude/skills/am/SKILL.md (English)`);
-    }
-  }
-  // zh is the default already installed by copyDir; nothing extra needed
 }
 
 function installHook(target) {
@@ -208,12 +227,12 @@ Usage:
 Options:
   --platform <name>   Target platform: claude (default), codex
   --target <path>     Project directory to install into (default: cwd)
-  --language <lang>   Skill language: zh (default), en
   --help              Show this help message
+
+Section names are configured in .anamnesis/config.yaml after install.
 
 Examples:
   anamnesis init --platform claude
-  anamnesis init --platform claude --language en --target ~/my-project
   anamnesis init --platform codex --target ~/my-project
 `);
 }
@@ -223,11 +242,9 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--platform') args.platform = argv[++i];
     else if (argv[i] === '--target') args.target = argv[++i];
-    else if (argv[i] === '--language') args.language = argv[++i];
     else if (argv[i] === '--help' || argv[i] === '-h') args.help = true;
     else if (argv[i].startsWith('--platform=')) args.platform = argv[i].slice(11);
     else if (argv[i].startsWith('--target=')) args.target = argv[i].slice(9);
-    else if (argv[i].startsWith('--language=')) args.language = argv[i].slice(11);
   }
   return args;
 }
@@ -247,7 +264,8 @@ if (require.main === module) {
 } else {
   module.exports = {
     parseArgs, copyDir, skillsDir, isGitRepo,
-    installHook, installClaudeSkillLanguage,
+    installHook, generateSkill, readInstalledSections,
     printClaudeMdHint, printCodexHint,
+    DEFAULT_SECTIONS,
   };
 }

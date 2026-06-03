@@ -6,10 +6,17 @@ Anamnesis reads `.anamnesis/config.yaml` in the user's project directory. All fi
 version: "0.1"
 
 inject:
-  max_concluded: 3       # how many recent concluded experiments to show
-  include_planning: false # whether to show planning (not-yet-started) experiments
+  max_concluded: 3        # how many recent concluded experiments to show
+  include_planning: false  # whether to show planning (not-yet-started) experiments
 
-language: auto           # reserved — not yet used by the hook
+sections:
+  question:    "核心問題"   # hypothesis: core research question
+  belief:      "目前認為"   # hypothesis: current belief
+  related:     "相關實驗"   # hypothesis: related experiments list
+  hypothesis:  "假說"      # experiment: specific testable claim
+  design:      "設計"      # experiment: how to test
+  results:     "結果"      # experiment: what happened
+  conclusion:  "結論"      # experiment: what was learned
 ```
 
 ---
@@ -34,11 +41,32 @@ When `true`, experiments with `status: planning` are included in the injected co
 
 ---
 
-## `language`
+## `sections`
 
-**Type**: string (`auto` | `en` | `zh`)  
-**Default**: `auto`
+**Type**: map of string → string  
+**Default**: Chinese headers (see above)
 
-Currently informational — not read by the hook at runtime. File format section headers (`## 結論` and `## Conclusion`) are detected automatically regardless of this setting.
+Controls the markdown section header names used in all `.anamnesis/` files. The hook reads this at runtime to locate the conclusion section; the `/am` skill uses these names when creating new files.
 
-The install-time language is set via `anamnesis init --language en|zh`, which controls which skill template is installed (Chinese or English section headers in `/am` command output).
+To use a different language or terminology, edit the values in `config.yaml` after install:
+
+```yaml
+sections:
+  question:    "Research Question"
+  belief:      "Current Belief"
+  related:     "Related Experiments"
+  hypothesis:  "Testable Claim"
+  design:      "Design"
+  results:     "Results"
+  conclusion:  "Conclusion"
+```
+
+Then regenerate the skill to match:
+
+```bash
+node /path/to/anamnesis/setup.js --platform claude --target .
+```
+
+(Setup skips existing files in `.anamnesis/` but always regenerates the skill.)
+
+Any key not specified falls back to the default Chinese value. Only `conclusion` is used by the hook; the rest are used by the AI skill for file creation.
