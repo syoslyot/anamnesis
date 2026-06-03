@@ -41,13 +41,38 @@ The hook writes a JSON object to stdout:
 
 If there is nothing to inject (no active hypotheses or experiments), the hook exits without writing to stdout.
 
+### Context block structure
+
+```
+<anamnesis>
+
+Open Hypotheses:
+  • [<id>] <first line of research question>
+
+Running Experiments:
+  • [<id>] <first line of testable claim> (n=X if run count is set)
+
+Blocked Experiments:
+  ⏸ [<id>] <first line> — <blocked_by reason>
+
+Planned Experiments:          ← only when include_planning: true
+  • [<id>] <first line>
+
+Recent Conclusions:
+  [<id>] <conclusion first line> (n=X if run count is set)
+
+</anamnesis>
+```
+
+Parked hypotheses and concluded experiments beyond `max_concluded` are not injected.
+
 ### Reference implementation
 
-The Node.js hook in `templates/common/.anamnesis/hooks/inject-context.js` is the canonical implementation. It is platform-agnostic: the only platform-specific part is how it is invoked (see below).
+`templates/common/.anamnesis/hooks/inject-context.js` is the canonical implementation. It is platform-agnostic: the only platform-specific part is how it is invoked.
 
 ### Claude Code registration
 
-The hook is registered in `.claude/settings.json` as a `UserPromptSubmit` hook:
+Registered in `.claude/settings.json` as a `UserPromptSubmit` hook:
 
 ```json
 {
@@ -64,13 +89,7 @@ The hook is registered in `.claude/settings.json` as a `UserPromptSubmit` hook:
 
 ### Codex: pre-session sync approach
 
-Codex does not support real-time hooks. Instead, anamnesis installs a sync script:
-
-```
-.anamnesis/hooks/sync-context.js
-```
-
-Running this script before a Codex session writes the current research state to `.anamnesis/context.md`. The AGENTS.md snippet references this file so Codex reads it at session start.
+Codex does not support real-time hooks. Instead, anamnesis installs a sync script at `.anamnesis/hooks/sync-context.js`. Running it before a session writes the current research state to `.anamnesis/context.md`, which the AGENTS.md snippet references.
 
 ```bash
 node .anamnesis/hooks/sync-context.js
@@ -80,20 +99,20 @@ codex  # start session
 ### Adding a new platform
 
 1. Determine whether the target platform supports pre-message hooks and what their invocation format is.
-2. If the platform can invoke a shell command and pipe JSON to stdin, the existing `inject-context.js` can be reused as-is.
-3. If it uses a file-based context approach (like Codex), reuse `sync-context.js` — it produces the same `<anamnesis>` block but writes it to a file instead of stdout.
-4. If neither, port the context-building logic. The core algorithm:
+2. If the platform can invoke a shell command and pipe JSON to stdin, `inject-context.js` can be reused as-is.
+3. If it uses a file-based context approach (like Codex), reuse `sync-context.js` — it produces the same `<anamnesis>` block but writes to a file instead of stdout.
+4. If neither, port the context-building logic:
    - Read `.anamnesis/config.yaml` for settings
    - Read all `.md` files from `.anamnesis/hypotheses/` and `.anamnesis/experiments/`
-   - Parse YAML frontmatter to get `status`, `id`, `updated`
-   - Extract `firstLine` (first non-heading body line) and `conclusion` (content under `## Conclusion` or `## 結論`)
-   - Emit the `<anamnesis>` block
+   - Parse YAML frontmatter: `status`, `id`, `updated`, `n`, `blocked_by`
+   - Extract `firstLine` (first non-heading body line) and `conclusion` (content under the configured conclusion header)
+   - Emit the `<anamnesis>` block following the structure above
 
 ---
 
 ## 2. Skill
 
-The skill is a markdown file that instructs the AI how to respond to `/am` subcommands. It is platform-specific only in its invocation syntax.
+The skill is a markdown file that instructs the AI how to respond to `/am` subcommands. It is platform-specific only in its invocation syntax (e.g. `/am` vs `am`).
 
 ### Subcommands
 
@@ -101,34 +120,41 @@ All platforms implement the same subcommands:
 
 | Subcommand | Action |
 |------------|--------|
-| `hyp` | Create a new hypothesis file |
+| `hyp` | Create a new hypothesis (infers from context, draft+confirm) |
 | `exp` | Create a new experiment file |
 | `run` | Set experiment status → `running` |
-| `done` | Fill results/conclusion, set status → `concluded` |
+| `done` | Fill conclusion, set status → `concluded`; offer report |
+| `rerun` | Append a run to the run log; update `n:` counter |
+| `compare` | Metrics comparison table for concluded experiments under a hypothesis |
+| `report` | Write experiment report using `prompts/report.md` |
+| `review` | Professor critique using `prompts/review.md` |
+| `correct` | Revised report using `prompts/correct.md` |
+| `park` | Set hypothesis status → `parked` |
+| `unpark` | Set hypothesis status → `open` |
+| `block` | Set experiment status → `blocked` (with optional reason) |
+| `unblock` | Set experiment status → `running` |
 | `find [keyword]` | Search across all anamnesis files |
-| `status` | Print overview of all hypotheses and experiments |
+| `status` | Full research overview |
 
-### File format
+### Skill generation
 
-Hypotheses and experiments use the same markdown + YAML frontmatter format regardless of platform. See `README.md` for the full format specification.
+Skills are generated from `SKILL.template.md` by `setup.js`, which substitutes `{{section_name}}` placeholders with the values from `config.yaml`. This ensures the generated skill uses the correct section headers for each project.
 
-Section headers may be in English or Chinese — the hook detects both. Skills should use whichever language fits the platform's typical user base, or use English for broader compatibility.
-
-### Template locations
+Template locations:
 
 ```
 templates/
-  claude/skills/am/SKILL.md   # Claude Code (/am slash command)
-  codex/skills/am/SKILL.md    # OpenAI Codex
+  claude/skills/am/SKILL.template.md
+  codex/skills/am/SKILL.template.md
 ```
 
 ### Adding a new platform
 
-1. Create `templates/<platform>/skills/am/SKILL.md`.
-2. Copy the structure from `templates/claude/skills/am/SKILL.en.md` (English) or `SKILL.md` (Chinese).
-3. Adjust the invocation syntax for the target platform (e.g. remove the leading `/` if the platform doesn't use it).
+1. Create `templates/<platform>/skills/am/SKILL.template.md`.
+2. Copy the structure from `templates/claude/skills/am/SKILL.template.md`.
+3. Adjust the invocation syntax (e.g. remove the leading `/` if the platform doesn't use slash commands).
 4. Add the platform to `setup.js`: `PLATFORMS` array, `skillsDir()` mapping, and any platform-specific install steps.
-5. Update the platform support table in `README.md`.
+5. Update the platform support table in `README.md` and this file.
 
 ---
 
@@ -139,3 +165,5 @@ templates/
 | Claude Code | ✅ | ✅ | Real-time `UserPromptSubmit` hook |
 | Codex | ✅ | ✅ | Pre-session sync via `sync-context.js` |
 | OpenCode | — | — | Planned |
+| Cursor | — | — | Planned |
+| Gemini CLI | — | — | Planned |
