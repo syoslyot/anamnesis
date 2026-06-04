@@ -387,6 +387,24 @@ describe('removeSnippet', () => {
     assert.equal(removeSnippet(p), true);
     assert.equal(fs.readFileSync(p, 'utf-8'), '');
   });
+
+  test('snippet at end of file — nothing after SNIPPET_END', () => {
+    const target = tmpDir();
+    const p = path.join(target, 'CLAUDE.md');
+    fs.writeFileSync(p, `# My Project\n\n${SNIPPET_START}\nsnippet\n${SNIPPET_END}\n`);
+    removeSnippet(p);
+    const result = fs.readFileSync(p, 'utf-8');
+    assert.ok(result.includes('# My Project'));
+    assert.ok(!result.includes(SNIPPET_START));
+  });
+
+  test('file contains only the snippet — produces empty file', () => {
+    const target = tmpDir();
+    const p = path.join(target, 'CLAUDE.md');
+    fs.writeFileSync(p, `${SNIPPET_START}\nonly snippet\n${SNIPPET_END}\n`);
+    removeSnippet(p);
+    assert.equal(fs.readFileSync(p, 'utf-8'), '');
+  });
 });
 
 // ─── removeHook ──────────────────────────────────────────────────────────────
@@ -424,6 +442,33 @@ describe('removeHook', () => {
     const target = tmpDir();
     write(target, '.claude/settings.json', 'not json {{{');
     assert.doesNotThrow(() => removeHook(target));
+  });
+
+  test('preserves other hook types when removing inject-context', () => {
+    const target = tmpDir();
+    write(target, '.claude/settings.json', JSON.stringify({
+      hooks: {
+        UserPromptSubmit: [
+          { matcher: '', hooks: [{ type: 'command', command: 'node .anamnesis/hooks/inject-context.js' }] },
+        ],
+        PostToolUse: [
+          { matcher: '', hooks: [{ type: 'command', command: 'node other.js' }] },
+        ],
+      }
+    }));
+    removeHook(target);
+    const settings = readJson(path.join(target, '.claude', 'settings.json'));
+    assert.equal(settings.hooks.UserPromptSubmit, undefined);
+    assert.ok(Array.isArray(settings.hooks.PostToolUse));
+  });
+
+  test('does nothing when UserPromptSubmit has no inject-context hook', () => {
+    const target = tmpDir();
+    const original = { hooks: { UserPromptSubmit: [{ matcher: '', hooks: [{ type: 'command', command: 'node other.js' }] }] } };
+    write(target, '.claude/settings.json', JSON.stringify(original));
+    removeHook(target);
+    const settings = readJson(path.join(target, '.claude', 'settings.json'));
+    assert.equal(settings.hooks.UserPromptSubmit.length, 1);
   });
 });
 
@@ -463,6 +508,19 @@ describe('hasUserData', () => {
   test('returns false when subdirectories are absent', () => {
     const target = tmpDir();
     fs.mkdirSync(path.join(target, '.anamnesis'), { recursive: true });
+    assert.equal(hasUserData(target), false);
+  });
+
+  test('returns false when directory contains only non-.md files', () => {
+    const target = tmpDir();
+    fs.mkdirSync(path.join(target, '.anamnesis', 'hypotheses'), { recursive: true });
+    fs.writeFileSync(path.join(target, '.anamnesis', 'hypotheses', 'config.yaml'), 'key: value');
+    assert.equal(hasUserData(target), false);
+  });
+
+  test('returns false when hypothesis directory is completely empty', () => {
+    const target = tmpDir();
+    fs.mkdirSync(path.join(target, '.anamnesis', 'hypotheses'), { recursive: true });
     assert.equal(hasUserData(target), false);
   });
 });
@@ -517,5 +575,29 @@ describe('uninstall', () => {
     const content = fs.readFileSync(path.join(target, 'CLAUDE.md'), 'utf-8');
     assert.ok(content.includes('# My Project'));
     assert.ok(content.includes('existing rules'));
+  });
+
+  test('removes AGENTS.md snippet for codex installs', async () => {
+    const target = tmpDir();
+    fs.mkdirSync(path.join(target, '.anamnesis'), { recursive: true });
+    printCodexHint(target);
+    await uninstall(target, { force: true });
+    const content = fs.readFileSync(path.join(target, 'AGENTS.md'), 'utf-8');
+    assert.ok(!content.includes(SNIPPET_START));
+    assert.ok(!content.includes('Anamnesis'));
+  });
+
+  test('removes .codex/skills/am/ for codex installs', async () => {
+    const target = tmpDir();
+    fs.mkdirSync(path.join(target, '.anamnesis'), { recursive: true });
+    generateSkill('codex', target, DEFAULT_SECTIONS);
+    await uninstall(target, { force: true });
+    assert.ok(!fs.existsSync(path.join(target, '.codex', 'skills', 'am')));
+  });
+
+  test('does not crash when CLAUDE.md does not exist', async () => {
+    const target = tmpDir();
+    fs.mkdirSync(path.join(target, '.anamnesis'), { recursive: true });
+    await assert.doesNotReject(() => uninstall(target, { force: true }));
   });
 });
