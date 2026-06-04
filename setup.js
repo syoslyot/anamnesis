@@ -2,6 +2,7 @@
 /**
  * Anamnesis setup script
  * Usage: anamnesis init [--platform claude|codex] [--target /path]
+ *        anamnesis uninstall [--target /path] [--force]
  *        node setup.js [--platform claude|codex] [--target /path]
  */
 
@@ -16,6 +17,9 @@ const PLATFORMS = ['claude', 'codex'];
 const SCRIPT_DIR = path.dirname(fs.realpathSync(__filename));
 const TEMPLATES = path.join(SCRIPT_DIR, 'templates');
 
+const SNIPPET_START = '<!-- anamnesis:start -->';
+const SNIPPET_END   = '<!-- anamnesis:end -->';
+
 const DEFAULT_SECTIONS = {
   question:   'Research Question',
   belief:     'Current Belief',
@@ -29,7 +33,17 @@ const DEFAULT_SECTIONS = {
 
 async function main() {
   const argv = process.argv.slice(2);
-  const args = parseArgs(argv[0] === 'init' ? argv.slice(1) : argv);
+  const subcommand = argv[0];
+
+  if (subcommand === 'uninstall') {
+    const args = parseArgs(argv.slice(1));
+    if (args.help) { printHelp(); process.exit(0); }
+    const target = args.target ? path.resolve(args.target) : process.cwd();
+    await uninstall(target, { force: !!args.force });
+    return;
+  }
+
+  const args = parseArgs(subcommand === 'init' ? argv.slice(1) : argv);
 
   if (args.help) {
     printHelp();
@@ -76,6 +90,117 @@ async function main() {
   console.log('   Prompts will be customized to your project on the first session.');
   console.log('   Start by running /am hyp to record your first hypothesis.\n');
 }
+
+// ─── uninstall ───────────────────────────────────────────────────────────────
+
+async function uninstall(target, { force = false } = {}) {
+  const anamnesisDir = path.join(target, '.anamnesis');
+
+  if (!fs.existsSync(anamnesisDir)) {
+    console.log('  ℹ  .anamnesis/ not found — nothing to remove.');
+    return;
+  }
+
+  if (!force && hasUserData(target)) {
+    console.warn('\n  ⚠  .anamnesis/ contains experiment records that will be permanently deleted.');
+    const confirmed = await askConfirm('  Remove everything including your records? (y/N): ');
+    if (!confirmed) {
+      console.log('  Aborted.');
+      return;
+    }
+  }
+
+  console.log(`\nRemoving anamnesis from: ${target}\n`);
+
+  fs.rmSync(anamnesisDir, { recursive: true, force: true });
+  console.log('  removed  .anamnesis/');
+
+  removeHook(target);
+
+  const claudeMd = path.join(target, 'CLAUDE.md');
+  if (removeSnippet(claudeMd)) {
+    console.log('  updated  CLAUDE.md (anamnesis snippet removed)');
+  }
+
+  const skillDir = path.join(target, '.claude', 'skills', 'am');
+  if (fs.existsSync(skillDir)) {
+    fs.rmSync(skillDir, { recursive: true, force: true });
+    console.log('  removed  .claude/skills/am/');
+  }
+
+  const agentsMd = path.join(target, 'AGENTS.md');
+  if (removeSnippet(agentsMd)) {
+    console.log('  updated  AGENTS.md (anamnesis snippet removed)');
+  }
+
+  const codexSkillDir = path.join(target, '.codex', 'skills', 'am');
+  if (fs.existsSync(codexSkillDir)) {
+    fs.rmSync(codexSkillDir, { recursive: true, force: true });
+    console.log('  removed  .codex/skills/am/');
+  }
+
+  console.log('\n✅ Anamnesis removed.\n');
+}
+
+// Returns true if .anamnesis/ contains any user-created .md files.
+function hasUserData(target) {
+  for (const dir of ['hypotheses', 'experiments', 'reports']) {
+    const full = path.join(target, '.anamnesis', dir);
+    if (!fs.existsSync(full)) continue;
+    const files = fs.readdirSync(full).filter(f => f.endsWith('.md') && f !== '.gitkeep');
+    if (files.length > 0) return true;
+  }
+  return false;
+}
+
+// Removes the anamnesis snippet from a file. Returns true if a change was made.
+// Prefers marker-based removal; falls back to heading-based for legacy installs.
+function removeSnippet(filePath) {
+  if (!fs.existsSync(filePath)) return false;
+  const content = fs.readFileSync(filePath, 'utf-8');
+
+  const si = content.indexOf(SNIPPET_START);
+  const ei = content.indexOf(SNIPPET_END);
+  if (si !== -1 && ei !== -1) {
+    const before = content.slice(0, si).trimEnd();
+    const after  = content.slice(ei + SNIPPET_END.length).trimStart();
+    const joined = before && after ? before + '\n\n' + after : before + after;
+    fs.writeFileSync(filePath, joined ? joined + '\n' : '');
+    return true;
+  }
+
+  // Legacy fallback: remove from the heading to end of file.
+  const heading = '## Anamnesis — Research Workflow Memory';
+  const hi = content.indexOf(heading);
+  if (hi !== -1) {
+    const before = content.slice(0, hi).trimEnd();
+    fs.writeFileSync(filePath, before ? before + '\n' : '');
+    return true;
+  }
+
+  return false;
+}
+
+// Removes the inject-context hook entry from .claude/settings.json.
+function removeHook(target) {
+  const settingsPath = path.join(target, '.claude', 'settings.json');
+  if (!fs.existsSync(settingsPath)) return;
+  try {
+    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+    if (!settings.hooks?.UserPromptSubmit) return;
+    settings.hooks.UserPromptSubmit = settings.hooks.UserPromptSubmit.filter(
+      h => !h.hooks?.some(hh => hh.command?.includes('inject-context'))
+    );
+    if (settings.hooks.UserPromptSubmit.length === 0) delete settings.hooks.UserPromptSubmit;
+    if (Object.keys(settings.hooks).length === 0) delete settings.hooks;
+    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+    console.log('  updated  .claude/settings.json (hook removed)');
+  } catch {
+    console.warn('  ⚠  Could not update .claude/settings.json — remove the inject-context hook manually');
+  }
+}
+
+// ─── install helpers ──────────────────────────────────────────────────────────
 
 // Reads section names from the installed config.yaml (or returns defaults).
 function readInstalledSections(target) {
@@ -179,7 +304,8 @@ function installHook(target) {
 
 function printClaudeMdHint(target) {
   const snippetPath = path.join(TEMPLATES, 'claude', 'claude-md-snippet.md');
-  const snippet = fs.readFileSync(snippetPath, 'utf-8').trimEnd();
+  const inner   = fs.readFileSync(snippetPath, 'utf-8').trimEnd();
+  const snippet = `${SNIPPET_START}\n${inner}\n${SNIPPET_END}`;
   const claudeMd = path.join(target, 'CLAUDE.md');
 
   if (fs.existsSync(claudeMd)) {
@@ -208,7 +334,8 @@ function printCodexHint(target) {
   const snippetPath = path.join(TEMPLATES, 'codex', 'agents-md-snippet.md');
   if (!fs.existsSync(snippetPath)) return;
 
-  const snippet = fs.readFileSync(snippetPath, 'utf-8').trimEnd();
+  const inner   = fs.readFileSync(snippetPath, 'utf-8').trimEnd();
+  const snippet = `${SNIPPET_START}\n${inner}\n${SNIPPET_END}`;
   const agentsMd = path.join(target, 'AGENTS.md');
 
   if (fs.existsSync(agentsMd)) {
@@ -228,17 +355,21 @@ function printCodexHint(target) {
   console.log('     to update .anamnesis/context.md with your current research state.\n');
 }
 
+// ─── CLI helpers ──────────────────────────────────────────────────────────────
+
 function printHelp() {
   console.log(`
-anamnesis — research workflow memory for AI coding agents
+anamnesis — experiment workflow memory for AI coding agents
 
 Usage:
   anamnesis init [options]
+  anamnesis uninstall [options]
   node setup.js [options]
 
 Options:
   --platform <name>   Target platform: claude (default), codex
-  --target <path>     Project directory to install into (default: cwd)
+  --target <path>     Project directory (default: cwd)
+  --force             Skip confirmation prompt when uninstalling with data
   --help              Show this help message
 
 Section names are configured in .anamnesis/config.yaml after install.
@@ -246,6 +377,8 @@ Section names are configured in .anamnesis/config.yaml after install.
 Examples:
   anamnesis init --platform claude
   anamnesis init --platform codex --target ~/my-project
+  anamnesis uninstall
+  anamnesis uninstall --target ~/my-project --force
 `);
 }
 
@@ -255,6 +388,7 @@ function parseArgs(argv) {
     if (argv[i] === '--platform') args.platform = argv[++i];
     else if (argv[i] === '--target') args.target = argv[++i];
     else if (argv[i] === '--help' || argv[i] === '-h') args.help = true;
+    else if (argv[i] === '--force') args.force = true;
     else if (argv[i].startsWith('--platform=')) args.platform = argv[i].slice(11);
     else if (argv[i].startsWith('--target=')) args.target = argv[i].slice(9);
   }
@@ -271,6 +405,16 @@ async function askPlatform() {
   });
 }
 
+async function askConfirm(question) {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise(resolve => {
+    rl.question(question, answer => {
+      rl.close();
+      resolve(answer.trim().toLowerCase() === 'y');
+    });
+  });
+}
+
 if (require.main === module) {
   main().catch(err => { console.error(err.message); process.exit(1); });
 } else {
@@ -278,6 +422,7 @@ if (require.main === module) {
     parseArgs, copyDir, skillsDir, isGitRepo,
     installHook, generateSkill, readInstalledSections,
     printClaudeMdHint, printCodexHint, createCustomizationMarker,
-    DEFAULT_SECTIONS,
+    uninstall, hasUserData, removeSnippet, removeHook,
+    DEFAULT_SECTIONS, SNIPPET_START, SNIPPET_END,
   };
 }

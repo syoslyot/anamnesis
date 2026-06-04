@@ -16,7 +16,13 @@ const {
   printClaudeMdHint,
   printCodexHint,
   createCustomizationMarker,
+  uninstall,
+  hasUserData,
+  removeSnippet,
+  removeHook,
   DEFAULT_SECTIONS,
+  SNIPPET_START,
+  SNIPPET_END,
 } = require('../setup');
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -69,6 +75,10 @@ describe('parseArgs', () => {
   test('does not accept --language (removed)', () => {
     const args = parseArgs(['--language', 'en']);
     assert.equal(args.language, undefined);
+  });
+
+  test('parses --force', () => {
+    assert.equal(parseArgs(['--force']).force, true);
   });
 });
 
@@ -291,5 +301,303 @@ describe('createCustomizationMarker', () => {
     fs.mkdirSync(path.join(target, '.anamnesis'));
     createCustomizationMarker(target);
     assert.equal(fs.readFileSync(path.join(target, '.anamnesis', '.needs-customization'), 'utf-8'), '');
+  });
+});
+
+// ─── snippet markers (install) ───────────────────────────────────────────────
+
+describe('printClaudeMdHint — snippet markers', () => {
+  test('wraps snippet with HTML markers', () => {
+    const target = tmpDir();
+    printClaudeMdHint(target);
+    const content = fs.readFileSync(path.join(target, 'CLAUDE.md'), 'utf-8');
+    assert.ok(content.includes(SNIPPET_START));
+    assert.ok(content.includes(SNIPPET_END));
+  });
+
+  test('markers appear in correct order', () => {
+    const target = tmpDir();
+    printClaudeMdHint(target);
+    const content = fs.readFileSync(path.join(target, 'CLAUDE.md'), 'utf-8');
+    assert.ok(content.indexOf(SNIPPET_START) < content.indexOf(SNIPPET_END));
+  });
+});
+
+describe('printCodexHint — snippet markers', () => {
+  test('wraps snippet with HTML markers', () => {
+    const target = tmpDir();
+    printCodexHint(target);
+    const content = fs.readFileSync(path.join(target, 'AGENTS.md'), 'utf-8');
+    assert.ok(content.includes(SNIPPET_START));
+    assert.ok(content.includes(SNIPPET_END));
+  });
+});
+
+// ─── removeSnippet ───────────────────────────────────────────────────────────
+
+describe('removeSnippet', () => {
+  test('returns false when file does not exist', () => {
+    assert.equal(removeSnippet('/nonexistent/CLAUDE.md'), false);
+  });
+
+  test('returns false when file has no anamnesis snippet', () => {
+    const target = tmpDir();
+    const p = path.join(target, 'CLAUDE.md');
+    fs.writeFileSync(p, '# My Project\n\nsome content\n');
+    assert.equal(removeSnippet(p), false);
+    assert.equal(fs.readFileSync(p, 'utf-8'), '# My Project\n\nsome content\n');
+  });
+
+  test('removes snippet between HTML markers', () => {
+    const target = tmpDir();
+    const p = path.join(target, 'CLAUDE.md');
+    fs.writeFileSync(p, `# My Project\n\n${SNIPPET_START}\n## Anamnesis\ncontent\n${SNIPPET_END}\n`);
+    assert.equal(removeSnippet(p), true);
+    const result = fs.readFileSync(p, 'utf-8');
+    assert.ok(!result.includes(SNIPPET_START));
+    assert.ok(!result.includes(SNIPPET_END));
+    assert.ok(!result.includes('## Anamnesis'));
+    assert.ok(result.includes('# My Project'));
+  });
+
+  test('preserves content before and after markers', () => {
+    const target = tmpDir();
+    const p = path.join(target, 'CLAUDE.md');
+    fs.writeFileSync(p, `# Before\n\n${SNIPPET_START}\nsnippet\n${SNIPPET_END}\n\n# After\n`);
+    removeSnippet(p);
+    const result = fs.readFileSync(p, 'utf-8');
+    assert.ok(result.includes('# Before'));
+    assert.ok(result.includes('# After'));
+  });
+
+  test('legacy fallback: removes from heading to end of file', () => {
+    const target = tmpDir();
+    const p = path.join(target, 'CLAUDE.md');
+    fs.writeFileSync(p, '# My Project\n\nexisting content\n\n## Anamnesis — Research Workflow Memory\nsnippet content\n');
+    assert.equal(removeSnippet(p), true);
+    const result = fs.readFileSync(p, 'utf-8');
+    assert.ok(result.includes('# My Project'));
+    assert.ok(!result.includes('Anamnesis'));
+  });
+
+  test('legacy fallback: handles snippet at start of file', () => {
+    const target = tmpDir();
+    const p = path.join(target, 'CLAUDE.md');
+    fs.writeFileSync(p, '## Anamnesis — Research Workflow Memory\nsnippet only\n');
+    assert.equal(removeSnippet(p), true);
+    assert.equal(fs.readFileSync(p, 'utf-8'), '');
+  });
+
+  test('snippet at end of file — nothing after SNIPPET_END', () => {
+    const target = tmpDir();
+    const p = path.join(target, 'CLAUDE.md');
+    fs.writeFileSync(p, `# My Project\n\n${SNIPPET_START}\nsnippet\n${SNIPPET_END}\n`);
+    removeSnippet(p);
+    const result = fs.readFileSync(p, 'utf-8');
+    assert.ok(result.includes('# My Project'));
+    assert.ok(!result.includes(SNIPPET_START));
+  });
+
+  test('file contains only the snippet — produces empty file', () => {
+    const target = tmpDir();
+    const p = path.join(target, 'CLAUDE.md');
+    fs.writeFileSync(p, `${SNIPPET_START}\nonly snippet\n${SNIPPET_END}\n`);
+    removeSnippet(p);
+    assert.equal(fs.readFileSync(p, 'utf-8'), '');
+  });
+});
+
+// ─── removeHook ──────────────────────────────────────────────────────────────
+
+describe('removeHook', () => {
+  test('does nothing when settings.json is absent', () => {
+    assert.doesNotThrow(() => removeHook(tmpDir()));
+  });
+
+  test('removes inject-context hook entry', () => {
+    const target = tmpDir();
+    installHook(target);
+    removeHook(target);
+    const settings = readJson(path.join(target, '.claude', 'settings.json'));
+    assert.equal(settings.hooks, undefined);
+  });
+
+  test('preserves other hooks when removing', () => {
+    const target = tmpDir();
+    write(target, '.claude/settings.json', JSON.stringify({
+      hooks: {
+        UserPromptSubmit: [
+          { matcher: '', hooks: [{ type: 'command', command: 'node .anamnesis/hooks/inject-context.js' }] },
+          { matcher: '', hooks: [{ type: 'command', command: 'node other-hook.js' }] },
+        ]
+      }
+    }));
+    removeHook(target);
+    const settings = readJson(path.join(target, '.claude', 'settings.json'));
+    assert.equal(settings.hooks.UserPromptSubmit.length, 1);
+    assert.ok(settings.hooks.UserPromptSubmit[0].hooks[0].command.includes('other-hook'));
+  });
+
+  test('does not crash on malformed settings.json', () => {
+    const target = tmpDir();
+    write(target, '.claude/settings.json', 'not json {{{');
+    assert.doesNotThrow(() => removeHook(target));
+  });
+
+  test('preserves other hook types when removing inject-context', () => {
+    const target = tmpDir();
+    write(target, '.claude/settings.json', JSON.stringify({
+      hooks: {
+        UserPromptSubmit: [
+          { matcher: '', hooks: [{ type: 'command', command: 'node .anamnesis/hooks/inject-context.js' }] },
+        ],
+        PostToolUse: [
+          { matcher: '', hooks: [{ type: 'command', command: 'node other.js' }] },
+        ],
+      }
+    }));
+    removeHook(target);
+    const settings = readJson(path.join(target, '.claude', 'settings.json'));
+    assert.equal(settings.hooks.UserPromptSubmit, undefined);
+    assert.ok(Array.isArray(settings.hooks.PostToolUse));
+  });
+
+  test('does nothing when UserPromptSubmit has no inject-context hook', () => {
+    const target = tmpDir();
+    const original = { hooks: { UserPromptSubmit: [{ matcher: '', hooks: [{ type: 'command', command: 'node other.js' }] }] } };
+    write(target, '.claude/settings.json', JSON.stringify(original));
+    removeHook(target);
+    const settings = readJson(path.join(target, '.claude', 'settings.json'));
+    assert.equal(settings.hooks.UserPromptSubmit.length, 1);
+  });
+});
+
+// ─── hasUserData ─────────────────────────────────────────────────────────────
+
+describe('hasUserData', () => {
+  test('returns false when .anamnesis/ has only gitkeep files', () => {
+    const target = tmpDir();
+    for (const dir of ['hypotheses', 'experiments', 'reports']) {
+      fs.mkdirSync(path.join(target, '.anamnesis', dir), { recursive: true });
+      fs.writeFileSync(path.join(target, '.anamnesis', dir, '.gitkeep'), '');
+    }
+    assert.equal(hasUserData(target), false);
+  });
+
+  test('returns true when hypotheses/ has a .md file', () => {
+    const target = tmpDir();
+    fs.mkdirSync(path.join(target, '.anamnesis', 'hypotheses'), { recursive: true });
+    fs.writeFileSync(path.join(target, '.anamnesis', 'hypotheses', 'my-hyp.md'), '---\nid: my-hyp\n---\n');
+    assert.equal(hasUserData(target), true);
+  });
+
+  test('returns true when experiments/ has a .md file', () => {
+    const target = tmpDir();
+    fs.mkdirSync(path.join(target, '.anamnesis', 'experiments'), { recursive: true });
+    fs.writeFileSync(path.join(target, '.anamnesis', 'experiments', 'exp-1.md'), '---\nid: exp-1\n---\n');
+    assert.equal(hasUserData(target), true);
+  });
+
+  test('returns true when reports/ has a .md file', () => {
+    const target = tmpDir();
+    fs.mkdirSync(path.join(target, '.anamnesis', 'reports'), { recursive: true });
+    fs.writeFileSync(path.join(target, '.anamnesis', 'reports', 'report.md'), 'content');
+    assert.equal(hasUserData(target), true);
+  });
+
+  test('returns false when subdirectories are absent', () => {
+    const target = tmpDir();
+    fs.mkdirSync(path.join(target, '.anamnesis'), { recursive: true });
+    assert.equal(hasUserData(target), false);
+  });
+
+  test('returns false when directory contains only non-.md files', () => {
+    const target = tmpDir();
+    fs.mkdirSync(path.join(target, '.anamnesis', 'hypotheses'), { recursive: true });
+    fs.writeFileSync(path.join(target, '.anamnesis', 'hypotheses', 'config.yaml'), 'key: value');
+    assert.equal(hasUserData(target), false);
+  });
+
+  test('returns false when hypothesis directory is completely empty', () => {
+    const target = tmpDir();
+    fs.mkdirSync(path.join(target, '.anamnesis', 'hypotheses'), { recursive: true });
+    assert.equal(hasUserData(target), false);
+  });
+});
+
+// ─── uninstall ───────────────────────────────────────────────────────────────
+
+describe('uninstall', () => {
+  test('removes .anamnesis/ directory', async () => {
+    const target = tmpDir();
+    fs.mkdirSync(path.join(target, '.anamnesis'), { recursive: true });
+    await uninstall(target, { force: true });
+    assert.ok(!fs.existsSync(path.join(target, '.anamnesis')));
+  });
+
+  test('removes anamnesis snippet from CLAUDE.md', async () => {
+    const target = tmpDir();
+    fs.mkdirSync(path.join(target, '.anamnesis'), { recursive: true });
+    printClaudeMdHint(target);
+    await uninstall(target, { force: true });
+    const content = fs.readFileSync(path.join(target, 'CLAUDE.md'), 'utf-8');
+    assert.ok(!content.includes(SNIPPET_START));
+    assert.ok(!content.includes('Anamnesis'));
+  });
+
+  test('removes .claude/skills/am/ directory', async () => {
+    const target = tmpDir();
+    fs.mkdirSync(path.join(target, '.anamnesis'), { recursive: true });
+    generateSkill('claude', target, DEFAULT_SECTIONS);
+    await uninstall(target, { force: true });
+    assert.ok(!fs.existsSync(path.join(target, '.claude', 'skills', 'am')));
+  });
+
+  test('removes inject-context hook from settings.json', async () => {
+    const target = tmpDir();
+    fs.mkdirSync(path.join(target, '.anamnesis'), { recursive: true });
+    installHook(target);
+    await uninstall(target, { force: true });
+    const settings = readJson(path.join(target, '.claude', 'settings.json'));
+    assert.equal(settings.hooks, undefined);
+  });
+
+  test('does nothing when .anamnesis/ is absent', async () => {
+    await assert.doesNotReject(() => uninstall(tmpDir(), { force: true }));
+  });
+
+  test('preserves existing CLAUDE.md content outside snippet', async () => {
+    const target = tmpDir();
+    fs.mkdirSync(path.join(target, '.anamnesis'), { recursive: true });
+    fs.writeFileSync(path.join(target, 'CLAUDE.md'), '# My Project\n\nexisting rules\n');
+    printClaudeMdHint(target);
+    await uninstall(target, { force: true });
+    const content = fs.readFileSync(path.join(target, 'CLAUDE.md'), 'utf-8');
+    assert.ok(content.includes('# My Project'));
+    assert.ok(content.includes('existing rules'));
+  });
+
+  test('removes AGENTS.md snippet for codex installs', async () => {
+    const target = tmpDir();
+    fs.mkdirSync(path.join(target, '.anamnesis'), { recursive: true });
+    printCodexHint(target);
+    await uninstall(target, { force: true });
+    const content = fs.readFileSync(path.join(target, 'AGENTS.md'), 'utf-8');
+    assert.ok(!content.includes(SNIPPET_START));
+    assert.ok(!content.includes('Anamnesis'));
+  });
+
+  test('removes .codex/skills/am/ for codex installs', async () => {
+    const target = tmpDir();
+    fs.mkdirSync(path.join(target, '.anamnesis'), { recursive: true });
+    generateSkill('codex', target, DEFAULT_SECTIONS);
+    await uninstall(target, { force: true });
+    assert.ok(!fs.existsSync(path.join(target, '.codex', 'skills', 'am')));
+  });
+
+  test('does not crash when CLAUDE.md does not exist', async () => {
+    const target = tmpDir();
+    fs.mkdirSync(path.join(target, '.anamnesis'), { recursive: true });
+    await assert.doesNotReject(() => uninstall(target, { force: true }));
   });
 });
