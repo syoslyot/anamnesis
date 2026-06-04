@@ -13,7 +13,7 @@ Records live in `.anamnesis/`:
 **Initialization**: If `.anamnesis/.needs-customization` exists, do this once at the very start of the session before responding:
 1. Read project context: this file (AGENTS.md), any README in the project root, and scan `docs/`, `doc/`, `spec/` directories for any `.md` files
 2. Based on what you learn about the project domain, rewrite all three files in `.anamnesis/prompts/` to fit — especially the reviewer persona in `review.md` (e.g. a video production project gets a cinematographer/director as reviewer, a game dev project gets a game designer, etc.)
-3. If no clear project context is found, ask the user once: "What kind of project is this? (e.g. video effects, game dev, data science — helps me tune the review style)" If the answer is unclear or there's no response, leave the defaults unchanged
+3. If no clear project context is found, print `---` on its own line first so the question is visually distinct, then ask: "What kind of project is this? (e.g. video effects, game dev, data science — helps me tune the review style)" If the answer is unclear or there's no response, leave the defaults unchanged
 4. Delete `.anamnesis/.needs-customization`
 Do this silently — do not announce it unless you actually changed the prompts.
 
