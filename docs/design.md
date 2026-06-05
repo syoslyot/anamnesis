@@ -1,6 +1,6 @@
 # Anamnesis — Design Document
 
-Date: 2026-06-04
+Date: 2026-06-05
 
 ---
 
@@ -73,7 +73,8 @@ user-project/
 │   │   ├── report.md
 │   │   ├── review.md
 │   │   └── correct.md
-│   └── config.yaml             # Anamnesis configuration
+│   ├── config.yaml             # Anamnesis configuration
+│   └── .inject-cache.json      # Transient — per-session injection dedup cache (gitignore recommended)
 └── .claude/
     ├── settings.json           # Hook registration (Claude Code)
     └── skills/
@@ -83,7 +84,9 @@ user-project/
 
 ### Hook behaviour (UserPromptSubmit, Node.js)
 
-Runs before every Claude message. Reads `.anamnesis/` and injects a compact context block:
+Fires before every user message. Reads `.anamnesis/` and builds a compact context block, then checks whether the content has changed since it was last injected for this session. If unchanged, the hook exits silently — no output, no token cost. If changed (or it's the first message of the session), it injects and updates the cache.
+
+**What gets injected:**
 
 - All `open` hypotheses (full first line)
 - `parked` hypotheses: not injected (deprioritized, visible only in `/am status`)
@@ -91,6 +94,8 @@ Runs before every Claude message. Reads `.anamnesis/` and injects a compact cont
 - All `blocked` experiments (first line + `blocked_by` reason if set)
 - Last 3 `concluded` experiments (one-line summary + icon; shows `(n=X)` if set)
 - `planning` experiments: not injected by default (configurable via `include_planning`)
+
+**Dedup cache:** Per-session MD5 hashes are stored in `.anamnesis/.inject-cache.json` (keyed by `session_id`). Up to 20 sessions are tracked; oldest entries are pruned automatically. The cache file is a transient runtime artifact — add it to `.gitignore` to keep it out of version control.
 
 This keeps token usage proportional to active work, not total project history.
 
