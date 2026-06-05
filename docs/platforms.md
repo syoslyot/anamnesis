@@ -23,11 +23,14 @@ Platforms should pass a JSON object to the hook via stdin:
 
 ```json
 {
-  "cwd": "/path/to/user/project"
+  "cwd": "/path/to/user/project",
+  "session_id": "abc123"
 }
 ```
 
 `cwd` tells the hook where to find `.anamnesis/`. If omitted, the hook falls back to `process.cwd()`.
+
+`session_id` is used for per-session injection deduplication — the hook skips output if the context hasn't changed since it was last injected for this session. If omitted, all requests share a single `"default"` session bucket (dedup still works, but multiple simultaneous sessions may interfere with each other).
 
 ### Output
 
