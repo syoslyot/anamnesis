@@ -10,6 +10,7 @@
 
 'use strict';
 
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
@@ -28,7 +29,31 @@ async function main() {
   const context = buildContext(anamnesisDir);
   if (!context) process.exit(0);
 
+  const sessionId = data.session_id || data.sessionId || 'default';
+  const contextHash = crypto.createHash('md5').update(context).digest('hex');
+  const cacheFile = path.join(anamnesisDir, '.inject-cache.json');
+
+  if (!updateInjectCache(cacheFile, sessionId, contextHash)) process.exit(0);
+
   process.stdout.write(JSON.stringify({ additionalContext: context }));
+}
+
+function updateInjectCache(cacheFile, sessionId, contextHash) {
+  let cache = {};
+  try { cache = JSON.parse(fs.readFileSync(cacheFile, 'utf-8')); } catch {}
+
+  if (cache[sessionId] === contextHash) return false;
+
+  cache[sessionId] = contextHash;
+  const keys = Object.keys(cache);
+  if (keys.length > 20) {
+    const pruned = {};
+    keys.slice(-20).forEach(k => { pruned[k] = cache[k]; });
+    cache = pruned;
+  }
+  try { fs.writeFileSync(cacheFile, JSON.stringify(cache)); } catch {}
+
+  return true;
 }
 
 function buildContext(anamnesisDir) {
@@ -203,5 +228,5 @@ function readStdin() {
 if (require.main === module) {
   main().catch(() => process.exit(0));
 } else {
-  module.exports = { parseFrontmatter, parseFile, loadFiles, loadConfig, buildContext, DEFAULT_SECTIONS, escapeRegex };
+  module.exports = { parseFrontmatter, parseFile, loadFiles, loadConfig, buildContext, updateInjectCache, DEFAULT_SECTIONS, escapeRegex };
 }
