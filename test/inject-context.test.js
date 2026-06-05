@@ -11,6 +11,7 @@ const {
   parseFile,
   loadConfig,
   buildContext,
+  updateInjectCache,
   DEFAULT_SECTIONS,
   escapeRegex,
 } = require('../templates/common/.anamnesis/hooks/inject-context');
@@ -352,6 +353,117 @@ describe('buildContext', () => {
     makeExperiment(dir, 'exp-de', { status: 'concluded', conclusion: '✅ gut', conclusionKey: 'Fazit' });
     const ctx = buildContext(dir);
     assert.ok(ctx.includes('✅ gut'));
+  });
+});
+
+// ─── updateInjectCache ───────────────────────────────────────────────────────
+
+describe('updateInjectCache', () => {
+  test('returns true when cache file does not exist', () => {
+    const dir = tmpDir();
+    assert.equal(updateInjectCache(path.join(dir, '.inject-cache.json'), 'sid-1', 'hash-a'), true);
+  });
+
+  test('creates cache file on first call', () => {
+    const dir = tmpDir();
+    const cacheFile = path.join(dir, '.inject-cache.json');
+    updateInjectCache(cacheFile, 'sid-1', 'hash-a');
+    assert.ok(fs.existsSync(cacheFile));
+  });
+
+  test('stores session hash in cache file', () => {
+    const dir = tmpDir();
+    const cacheFile = path.join(dir, '.inject-cache.json');
+    updateInjectCache(cacheFile, 'sid-1', 'hash-a');
+    const cache = JSON.parse(fs.readFileSync(cacheFile, 'utf-8'));
+    assert.equal(cache['sid-1'], 'hash-a');
+  });
+
+  test('returns false when called again with same hash (cache hit)', () => {
+    const dir = tmpDir();
+    const cacheFile = path.join(dir, '.inject-cache.json');
+    updateInjectCache(cacheFile, 'sid-1', 'hash-a');
+    assert.equal(updateInjectCache(cacheFile, 'sid-1', 'hash-a'), false);
+  });
+
+  test('returns true when context has changed', () => {
+    const dir = tmpDir();
+    const cacheFile = path.join(dir, '.inject-cache.json');
+    updateInjectCache(cacheFile, 'sid-1', 'hash-a');
+    assert.equal(updateInjectCache(cacheFile, 'sid-1', 'hash-b'), true);
+  });
+
+  test('updates stored hash after context change', () => {
+    const dir = tmpDir();
+    const cacheFile = path.join(dir, '.inject-cache.json');
+    updateInjectCache(cacheFile, 'sid-1', 'hash-a');
+    updateInjectCache(cacheFile, 'sid-1', 'hash-b');
+    const cache = JSON.parse(fs.readFileSync(cacheFile, 'utf-8'));
+    assert.equal(cache['sid-1'], 'hash-b');
+  });
+
+  test('returns false after context change is acknowledged', () => {
+    const dir = tmpDir();
+    const cacheFile = path.join(dir, '.inject-cache.json');
+    updateInjectCache(cacheFile, 'sid-1', 'hash-a');
+    updateInjectCache(cacheFile, 'sid-1', 'hash-b');
+    assert.equal(updateInjectCache(cacheFile, 'sid-1', 'hash-b'), false);
+  });
+
+  test('tracks multiple sessions independently', () => {
+    const dir = tmpDir();
+    const cacheFile = path.join(dir, '.inject-cache.json');
+    updateInjectCache(cacheFile, 'sid-1', 'hash-a');
+    updateInjectCache(cacheFile, 'sid-2', 'hash-a');
+    assert.equal(updateInjectCache(cacheFile, 'sid-1', 'hash-a'), false);
+    assert.equal(updateInjectCache(cacheFile, 'sid-2', 'hash-a'), false);
+    assert.equal(updateInjectCache(cacheFile, 'sid-3', 'hash-a'), true);
+  });
+
+  test('cache hit for one session does not affect other sessions', () => {
+    const dir = tmpDir();
+    const cacheFile = path.join(dir, '.inject-cache.json');
+    updateInjectCache(cacheFile, 'sid-1', 'hash-a');
+    updateInjectCache(cacheFile, 'sid-2', 'hash-a');
+    updateInjectCache(cacheFile, 'sid-1', 'hash-b'); // sid-1 context changed
+    assert.equal(updateInjectCache(cacheFile, 'sid-2', 'hash-a'), false); // sid-2 unaffected
+  });
+
+  test('prunes oldest entries when cache exceeds 20 sessions', () => {
+    const dir = tmpDir();
+    const cacheFile = path.join(dir, '.inject-cache.json');
+    for (let i = 1; i <= 21; i++) {
+      updateInjectCache(cacheFile, `sid-${i}`, `hash-${i}`);
+    }
+    const cache = JSON.parse(fs.readFileSync(cacheFile, 'utf-8'));
+    assert.equal(Object.keys(cache).length, 20);
+    assert.equal(cache['sid-1'], undefined);
+    assert.equal(cache['sid-21'], 'hash-21');
+  });
+
+  test('handles corrupted cache file (injects and overwrites)', () => {
+    const dir = tmpDir();
+    const cacheFile = path.join(dir, '.inject-cache.json');
+    fs.writeFileSync(cacheFile, 'not valid json {{{');
+    assert.equal(updateInjectCache(cacheFile, 'sid-1', 'hash-a'), true);
+  });
+
+  test('recovers from corrupted cache on next call', () => {
+    const dir = tmpDir();
+    const cacheFile = path.join(dir, '.inject-cache.json');
+    fs.writeFileSync(cacheFile, 'not valid json {{{');
+    updateInjectCache(cacheFile, 'sid-1', 'hash-a');
+    // After recovery, cache should be valid
+    assert.equal(updateInjectCache(cacheFile, 'sid-1', 'hash-a'), false);
+  });
+
+  test('returns true even when cache file cannot be written', () => {
+    const dir = tmpDir();
+    const cacheFile = path.join(dir, 'no-such-subdir', '.inject-cache.json');
+    assert.doesNotThrow(() => {
+      const result = updateInjectCache(cacheFile, 'sid-1', 'hash-a');
+      assert.equal(result, true);
+    });
   });
 });
 

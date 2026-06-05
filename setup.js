@@ -20,16 +20,7 @@ const TEMPLATES = path.join(SCRIPT_DIR, 'templates');
 const SNIPPET_START = '<!-- anamnesis:start -->';
 const SNIPPET_END   = '<!-- anamnesis:end -->';
 
-const DEFAULT_SECTIONS = {
-  question:   'Research Question',
-  belief:     'Current Belief',
-  related:    'Related Experiments',
-  hypothesis: 'Testable Claim',
-  design:     'Design',
-  results:    'Results',
-  runs:       'Run Log',
-  conclusion: 'Conclusion',
-};
+const { DEFAULT_SECTIONS } = require(path.join(SCRIPT_DIR, 'templates', 'common', '.anamnesis', 'hooks', 'inject-context'));
 
 async function main() {
   const argv = process.argv.slice(2);
